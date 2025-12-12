@@ -471,12 +471,12 @@ type FetchAPIOptions = Omit<RequestInit, 'body'> & {
 
 export const fetchAPI = async (url: string, options: FetchAPIOptions = {}) => {
   const { method, headers, body, ...restOptions } = options;
-  
+
   let cookieString = '';
   if (typeof document !== 'undefined' && typeof document.cookie === 'string') {
     cookieString = document.cookie || '';
   }
-  
+
   const fetchOptions: RequestInit = {
     ...restOptions,
     method: method || HTTPMethods.GET,
