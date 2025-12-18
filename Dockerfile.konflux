@@ -1,11 +1,11 @@
 FROM registry.access.redhat.com/ubi9/nodejs-20:9.6 AS ui-builder
 WORKDIR /opt/app-root/src
 USER 0
+RUN npm install -g yarn
 COPY --chown=1001:0 mlflow/server/js/ .
-# Use npm with prefetched dependencies for hermetic builds
-RUN if [ -f /cachi2/cachi2.env ]; then . /cachi2/cachi2.env; fi && \
-    npm ci --ignore-scripts && \
-    npm run build
+USER 1001
+RUN yarn install --silent \
+    && yarn build
 
 FROM registry.access.redhat.com/ubi9/python-311:9.6 AS python-builder
 WORKDIR /src
