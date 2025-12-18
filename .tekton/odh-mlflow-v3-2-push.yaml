@@ -50,7 +50,7 @@ spec:
   - name: hermetic
     value: true
   - name: prefetch-input
-    value: '[{"type": "pip", "path": ".", "requirements_files": ["requirements/requirements.txt"]}, {"type": "npm", "path": "mlflow/server/js/"}]'
+    value: '[{"type": "pip", "path": ".", "requirements_files": ["requirements/requirements.txt"]}, {"type": "npm", "path": "mlflow/server/js"}]'
   - name: build-image-index
     value: true
   pipelineRef:
