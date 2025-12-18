@@ -46,7 +46,7 @@ spec:
   - name: hermetic
     value: true
   - name: prefetch-input
-    value: '{"type": "pip", "path": ".", "requirements_files": ["requirements.txt"]}'
+    value: '{"type": "pip", "path": ".", "requirements_files": ["requirements/requirements.txt"]}'
   pipelineRef:
     resolver: git
     params:
