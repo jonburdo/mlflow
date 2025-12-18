@@ -44,7 +44,7 @@ spec:
   - name: build-image-index
     value: true
   - name: hermetic
-    value: false
+    value: true
   pipelineRef:
     resolver: git
     params:
