@@ -24,6 +24,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from mlflow.entities import Workspace
 from mlflow.exceptions import MlflowException
 from mlflow.tracing.utils.otlp import OTLP_TRACES_PATH
 from mlflow.utils import workspace_context
@@ -39,6 +40,9 @@ def _compile_rules(monkeypatch):
         "kubernetes_workspace_provider.auth.mlflow_app.url_map.iter_rules",
         lambda: [],
     )
+    monkeypatch.setattr("kubernetes_workspace_provider.auth._RULES_COMPILED", False)
+    monkeypatch.setattr("kubernetes_workspace_provider.auth._AUTH_RULES", {})
+    monkeypatch.setattr("kubernetes_workspace_provider.auth._AUTH_REGEX_RULES", [])
     _compile_authorization_rules()
 
 
@@ -50,6 +54,62 @@ def test_otel_endpoints_in_auth_rules():
     # Verify they have the correct authorization rule
     rule = PATH_AUTHORIZATION_RULES[(OTLP_TRACES_PATH, "POST")]
     assert (rule.verb, rule.resource) == ("update", "experiments")
+
+
+def test_otel_trace_endpoint_authorized(mock_authorizer, mock_config, monkeypatch):
+    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
+
+    from mlflow.server.otel_api import otel_router
+
+    monkeypatch.setattr(
+        "kubernetes_workspace_provider.auth.resolve_workspace_from_header",
+        lambda _value: Workspace("default"),
+    )
+
+    class DummyTrackingStore:
+        def log_spans(self, experiment_id, spans):
+            pass
+
+    monkeypatch.setattr(
+        "mlflow.server.otel_api._get_tracking_store",
+        lambda: DummyTrackingStore(),
+    )
+
+    app = FastAPI()
+    app.add_middleware(
+        KubernetesAuthMiddleware,
+        authorizer=mock_authorizer,
+        config_values=mock_config,
+    )
+    app.include_router(otel_router)
+
+    client = TestClient(app)
+
+    # Build a valid OTLP protobuf payload
+    request = ExportTraceServiceRequest()
+    span = request.resource_spans.add().scope_spans.add().spans.add()
+    span.trace_id = b"\x00" * 16
+    span.span_id = b"\x01" * 8
+    span.name = "test-span"
+    payload = request.SerializeToString()
+
+    with patch("kubernetes_workspace_provider.auth._parse_jwt_subject", return_value="k8s-user"):
+        response = client.post(
+            OTLP_TRACES_PATH,
+            data=payload,
+            headers={
+                "Authorization": "Bearer trace-token",
+                "Content-Type": "application/x-protobuf",
+                "X-MLflow-Experiment-Id": "42",
+                WORKSPACE_HEADER_NAME: "default",
+            },
+        )
+
+    assert response.status_code == 200
+    mock_authorizer.is_allowed.assert_called_once()
+    identity, resource, verb, namespace = mock_authorizer.is_allowed.call_args[0]
+    assert identity.token == "trace-token"
+    assert (resource, verb, namespace) == ("experiments", "update", "default")
 
 
 def test_trace_get_endpoints_in_auth_rules():
@@ -493,13 +553,18 @@ def test_job_api_endpoints_prefer_forwarded_token_on_invalid_authorization(
     assert (resource, verb, namespace) == ("jobs", "get", "team-a")
 
 
-def test_job_api_missing_workspace_context_returns_error(mock_authorizer, mock_config) -> None:
+def test_job_api_missing_workspace_context_returns_error(
+    mock_authorizer, mock_config, monkeypatch
+) -> None:
     """Missing workspace context should be surfaced as a server error."""
     app = FastAPI()
     app.add_middleware(
         KubernetesAuthMiddleware,
         authorizer=mock_authorizer,
         config_values=mock_config,
+    )
+    monkeypatch.setattr(
+        "kubernetes_workspace_provider.auth.resolve_workspace_from_header", lambda _value: None
     )
 
     @app.get("/ajax-api/3.0/jobs/123")
@@ -512,7 +577,6 @@ def test_job_api_missing_workspace_context_returns_error(mock_authorizer, mock_c
         "/ajax-api/3.0/jobs/123",
         headers={
             "Authorization": "Bearer valid-token",
-            WORKSPACE_HEADER_NAME: "team-a",
         },
     )
 

@@ -154,6 +154,7 @@ from mlflow.server import app as mlflow_app
 from mlflow.server import handlers as mlflow_handlers
 from mlflow.server.fastapi_app import FASTAPI_NATIVE_PREFIXES, create_fastapi_app
 from mlflow.server.handlers import STATIC_PREFIX_ENV_VAR, get_endpoints
+from mlflow.server.workspace_helpers import WORKSPACE_HEADER_NAME, resolve_workspace_from_header
 from mlflow.tracing.utils.otlp import OTLP_TRACES_PATH
 from mlflow.utils import workspace_context
 
@@ -1457,6 +1458,25 @@ class KubernetesAuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         workspace_name = workspace_context.get_request_workspace()
+        workspace_token = None
+
+        if workspace_name is None:
+            # FastAPI executes middlewares in reverse order, so this auth middleware can run before
+            # the MLflow workspace middleware. Resolve here using the same helper, which also falls
+            # back to the configured default workspace when the header is missing or empty.
+            try:
+                workspace = resolve_workspace_from_header(
+                    request.headers.get(WORKSPACE_HEADER_NAME)
+                )
+            except MlflowException as exc:
+                return JSONResponse(
+                    status_code=exc.get_http_status_code(),
+                    content=json.loads(exc.serialize_as_json()),
+                )
+
+            if workspace is not None:
+                workspace_name = workspace.name
+                workspace_token = workspace_context.set_current_workspace(workspace_name)
 
         # Check permissions if verb is specified
         try:
@@ -1472,6 +1492,8 @@ class KubernetesAuthMiddleware(BaseHTTPMiddleware):
                 workspace=workspace_name,
             )
         except MlflowException as exc:
+            if workspace_token is not None:
+                workspace_context.reset_workspace(workspace_token)
             if (
                 workspace_name is None
                 and exc.error_code
@@ -1487,8 +1509,12 @@ class KubernetesAuthMiddleware(BaseHTTPMiddleware):
                 content={"error": {"code": exc.error_code, "message": exc.message}},
             )
 
-        # Continue with the request
-        return await call_next(request)
+        # Continue with the request, clearing any temporary workspace context.
+        try:
+            return await call_next(request)
+        finally:
+            if workspace_token is not None:
+                workspace_context.reset_workspace(workspace_token)
 
 
 def _override_run_user(username: str) -> None:

@@ -88,6 +88,9 @@ def _compile_rules(monkeypatch):
         "kubernetes_workspace_provider.auth.mlflow_app.url_map.iter_rules",
         lambda: [],
     )
+    monkeypatch.setattr("kubernetes_workspace_provider.auth._RULES_COMPILED", False)
+    monkeypatch.setattr("kubernetes_workspace_provider.auth._AUTH_RULES", {})
+    monkeypatch.setattr("kubernetes_workspace_provider.auth._AUTH_REGEX_RULES", [])
     _compile_authorization_rules()
 
 
