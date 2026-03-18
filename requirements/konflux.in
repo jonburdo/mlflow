@@ -1,0 +1,5 @@
+# Additional runtime dependencies for Dockerfile.konflux that are not covered
+# by the root mlflow wheel metadata alone.
+boto3
+psycopg2
+kubernetes>=29.0.0
