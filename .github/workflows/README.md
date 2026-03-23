@@ -4,7 +4,6 @@
 
 | File                      | Role                                                                 |
 | :------------------------ | :------------------------------------------------------------------- |
-| `cross-version-tests.yml` | Run cross version tests. See `cross-version-testing.md` for details. |
 | `examples.yml`            | Run tests for example scripts & projects                             |
 | `master.yml `             | Run unit and integration tests                                       |
 
