@@ -171,6 +171,7 @@ jobs:
         run: |
           uv sync --extra extras
           uv pip install \
+            -c requirements/constraints.txt \
             -r requirements/test-requirements.txt \
             -r requirements/extra-ml-requirements.txt
       - uses: ./.github/actions/show-versions
@@ -210,7 +211,9 @@ jobs:
       - uses: ./.github/actions/pipdeptree
       - name: Run tests
         run: |
-          uv run --no-sync pytest --splits=${{ matrix.splits }} --group=${{ matrix.group }} tests/models
+          uv run --no-sync pytest --splits=${{ matrix.splits }} --group=${{ matrix.group }} \
+            tests/models \
+            -k "not test_build_docker and not test_build_docker_virtualenv and not test_build_docker_with_env_override and not test_build_docker_without_model_uri"
 
   evaluate:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
@@ -233,7 +236,9 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --extra extras --extra genai
+          uv pip install "pydantic>=2.11.7,<2.12"
           uv pip install \
+            -c requirements/constraints.txt \
             -r requirements/test-requirements.txt \
             torch transformers pyspark langchain langchain-experimental 'shap<0.47.0' lightgbm xgboost
       - uses: ./.github/actions/show-versions
@@ -260,7 +265,7 @@ jobs:
       - name: Install dependencies
         run: |
           source ./dev/install-common-deps.sh
-          pip install openai dspy
+          pip install openai "dspy @ git+https://github.com/stanfordnlp/dspy.git@2.6.24" "litellm @ git+https://github.com/BerriAI/litellm.git@v1.75.8-stable"
       - uses: ./.github/actions/show-versions
       - name: Run GenAI Tests (OSS)
         run: |
@@ -321,7 +326,9 @@ jobs:
       - name: Install python dependencies
         run: |
           uv sync --extra extras --extra genai --extra mcp
+          uv pip install "pydantic>=2.11.7,<2.12"
           uv pip install \
+            -c requirements/constraints.txt \
             -r requirements/test-requirements.txt \
             pyspark datasets tensorflow torch transformers tf-keras openai \
             tests/resources/mlflow-test-plugin

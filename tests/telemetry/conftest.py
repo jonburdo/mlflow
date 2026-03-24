@@ -5,7 +5,7 @@ import pytest
 import mlflow
 import mlflow.telemetry.utils
 from mlflow.telemetry.client import TelemetryClient, _set_telemetry_client, get_telemetry_client
-from mlflow.version import VERSION
+from mlflow.telemetry.schemas import TelemetryConfig
 
 
 @pytest.fixture(autouse=True)
@@ -57,20 +57,13 @@ def mock_requests_get(request):
         yield
         return
 
-    with patch("mlflow.telemetry.client.requests.get") as mock_get:
-        mock_get.return_value = Mock(
-            status_code=200,
-            json=Mock(
-                return_value={
-                    "mlflow_version": VERSION,
-                    "disable_telemetry": False,
-                    "ingestion_url": "http://localhost:9999",
-                    "rollout_percentage": 100,
-                    "disable_events": [],
-                    "disable_sdks": [],
-                }
-            ),
+    def _set_mock_config(self):
+        self.config = TelemetryConfig(
+            ingestion_url="http://localhost:9999",
+            disable_events=set(),
         )
+
+    with patch.object(TelemetryClient, "_get_config", _set_mock_config):
         yield
 
 

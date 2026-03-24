@@ -71,11 +71,10 @@ anthropic
 # Required by mlflow.ag2
 ag2
 # Required by mlflow.dspy
-# In dspy 2.6.9, `dspy.__name__` is not 'dspy', but 'dspy.__metadata__',
-# which causes auto-logging tests to fail.
-dspy!=2.6.9
+# The rhoai-3.3 branch still targets the pre-3.x DSPy API surface.
+dspy @ git+https://github.com/stanfordnlp/dspy.git@2.6.24
 # Required by mlflow.litellm
-litellm
+litellm @ git+https://github.com/BerriAI/litellm.git@v1.75.8-stable
 # Required by mlflow.gemini
 google-genai
 # Required by mlflow.groq

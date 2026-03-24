@@ -25,6 +25,7 @@ defaults:
 env:
   MLFLOW_HOME: /home/runner/work/mlflow/mlflow
   MLFLOW_CONDA_HOME: /usr/share/miniconda
+  PIP_CONSTRAINT: /home/runner/work/mlflow/mlflow/requirements/constraints.txt
   PYTHONUTF8: "1"
   MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"
 
