@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/nodejs-20@sha256:d9126d75c4554904a7fdd8ebbd49afe0961fdbb95b3044517870ab857cded8f1 AS ui-builder
+FROM registry.access.redhat.com/ubi9/nodejs-20@sha256:55e163fe0d63b0ee074035fac32034ddf2f301bb9929904f8ce43edeb7b40179 AS ui-builder
 WORKDIR /opt/app-root/src
 USER 0
 RUN npm install -g yarn
@@ -7,7 +7,7 @@ USER 1001
 RUN yarn install --silent \
     && yarn build
 
-FROM registry.access.redhat.com/ubi9/python-311@sha256:c9e87a6b009e58848503e22b5e540bec3b85f0bc3c7343926d70e4b82a191158 AS python-builder
+FROM registry.access.redhat.com/ubi9/python-311@sha256:7671c961bb60490b6cdd5c078f9c8ebb0392cddb736f91c22a605eeec00f663e AS python-builder
 WORKDIR /src
 USER 0
 COPY --chown=1001:0 . .
@@ -16,7 +16,7 @@ RUN set -eux; \
     python -m build --wheel --outdir /tmp/dist; \
     python -m build --wheel --outdir /tmp/dist kubernetes-workspace-provider
 
-FROM registry.access.redhat.com/ubi9/python-311@sha256:c9e87a6b009e58848503e22b5e540bec3b85f0bc3c7343926d70e4b82a191158
+FROM registry.access.redhat.com/ubi9/python-311@sha256:7671c961bb60490b6cdd5c078f9c8ebb0392cddb736f91c22a605eeec00f663e
 ARG MLFLOW_VERSION=3.3.2
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
