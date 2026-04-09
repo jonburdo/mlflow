@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/nodejs-20@sha256:55e163fe0d63b0ee074035fac32034ddf2f301bb9929904f8ce43edeb7b40179 AS ui-builder
+FROM registry.access.redhat.com/ubi9/nodejs-20@sha256:46ddfc86cf90e9c665f85e30b27821ab552dae3328e22a665c2ebe246578b271 AS ui-builder
 WORKDIR /opt/app-root/src
 USER 0
 RUN npm install -g yarn
