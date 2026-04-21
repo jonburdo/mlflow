@@ -7,7 +7,7 @@ USER 1001
 RUN yarn install --silent \
     && yarn build
 
-FROM registry.access.redhat.com/ubi9/python-311@sha256:6aeddf1c0eeb8f14784b4e92c893c4a325597ba50fce0e768182417c6dfd4a89 AS python-builder
+FROM registry.access.redhat.com/ubi9/python-311@sha256:2b34df338ef5aab6880f882f75f6efa92193362bf0a27bb7f88dca621fe78492 AS python-builder
 WORKDIR /src
 USER 0
 COPY --chown=1001:0 . .
@@ -16,7 +16,7 @@ RUN set -eux; \
     python -m build --wheel --outdir /tmp/dist; \
     python -m build --wheel --outdir /tmp/dist kubernetes-workspace-provider
 
-FROM registry.access.redhat.com/ubi9/python-311@sha256:6aeddf1c0eeb8f14784b4e92c893c4a325597ba50fce0e768182417c6dfd4a89
+FROM registry.access.redhat.com/ubi9/python-311@sha256:2b34df338ef5aab6880f882f75f6efa92193362bf0a27bb7f88dca621fe78492
 ARG MLFLOW_VERSION=3.3.2
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
