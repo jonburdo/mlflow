@@ -218,6 +218,8 @@
     "@types/react": "^17.0.50",
     "@types/node": "22.18.8",
     "@emotion/react": "11.11.0",
+    "es5-ext": "npm:@unes/es5-ext@0.10.64-1",
+    "fsevents@npm:^1.2.7": "1.2.13",
     "@types/react-plotly.js/@types/plotly.js": "^2.35.14",
     "babel-jest": "^30.2.0",
     "cheerio": ">=1.0.0-rc.3 <1.0.0",
