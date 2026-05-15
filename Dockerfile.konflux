@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/nodejs-20:9.7@sha256:74cc7b1d13592b1e425074f434b90e470ab209da85fd1fdb8e6e9e4cabaec51a AS ui-builder
+FROM registry.access.redhat.com/ubi9/nodejs-24:9.7@sha256:06a4942584cad8a566450b5775c9564a09802f07a5c3cf2c9ea440aa84cec357 AS ui-builder
 WORKDIR /opt/app-root/src
 USER 0
 COPY --chown=1001:0 mlflow/server/js/ .
