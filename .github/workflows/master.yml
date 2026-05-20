@@ -1,6 +1,16 @@
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && format('CI: {0} (via {1})', inputs.ref, github.ref_name)
+      || 'MLflow tests' }}
 name: MLflow tests
 
 on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch to test'
+        required: true
+        type: string
   pull_request:
     types:
       - opened
@@ -21,7 +31,7 @@ on:
       - branch-[0-9]+.[0-9]+
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ inputs.ref || '' }}
   cancel-in-progress: true
 
 # Use `bash` by default for all `run` steps in this workflow:
@@ -57,6 +67,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/untracked
       - uses: ./.github/actions/setup-python
       - name: Install dependencies
@@ -82,6 +93,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
           submodules: true
       - uses: ./.github/actions/untracked
       - uses: ./.github/actions/free-disk-space
@@ -131,6 +143,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/untracked
       - name: Build
         run: |
@@ -188,6 +201,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/untracked
       - uses: ./.github/actions/setup-python
       - uses: ./.github/actions/setup-pyenv
@@ -212,6 +226,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/untracked
       - uses: ./.github/actions/setup-python
       - uses: ./.github/actions/setup-pyenv
@@ -246,6 +261,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/untracked
       - uses: ./.github/actions/free-disk-space
       - uses: ./.github/actions/setup-python
@@ -281,6 +297,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/untracked
       - uses: ./.github/actions/setup-python
       - uses: ./.github/actions/setup-pyenv
@@ -312,6 +329,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/untracked
       - uses: ./.github/actions/setup-python
       - uses: ./.github/actions/setup-pyenv
@@ -360,6 +378,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/untracked
       - uses: ./.github/actions/free-disk-space
       - uses: ./.github/actions/setup-python
@@ -399,6 +418,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
           submodules: true
       - uses: ./.github/actions/untracked
       - uses: ./.github/actions/setup-python
