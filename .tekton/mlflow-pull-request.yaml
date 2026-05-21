@@ -71,9 +71,9 @@ spec:
     computeResources:
       requests:
         cpu: '1'
-        memory: 5120Mi
+        memory: 4608Mi
       limits:
-        memory: 5120Mi
+        memory: 4608Mi
   taskRunTemplate:
     serviceAccountName: build-pipeline-pull-request-pipelines
   workspaces:
