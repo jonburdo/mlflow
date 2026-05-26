@@ -34,7 +34,7 @@ RUN if [ -f /cachi2/cachi2.env ]; then . /cachi2/cachi2.env; fi && \
     python -m build --wheel --outdir /tmp/dist libs/skinny && \
     python -m build --wheel --outdir /tmp/dist .
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7@sha256:12db9874bd753eb98b1ab3d840e75de5d6842ac0604fbd68c012adefe97140be
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7@sha256:907b68736aa798b2d38255b7aa070b2a70acb90803864a40f05d0ec47556ddd0
 ARG MLFLOW_VERSION=3.3.2
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
