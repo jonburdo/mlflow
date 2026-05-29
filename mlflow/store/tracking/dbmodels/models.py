@@ -3249,34 +3249,70 @@ class SqlMCPServer(Base):
         return f"<SqlMCPServer ({self.name}, {self.workspace})>"
 
     @classmethod
-    def with_resolved_latest(cls, query):
-        pinned_version = aliased(SqlMCPServerVersion, name="pinned_mcp_server_version")
-        latest_candidates = (
+    def _latest_candidates_query(cls):
+        return sa.select(
+            SqlMCPServerVersion.workspace.label("workspace"),
+            SqlMCPServerVersion.name.label("name"),
+            SqlMCPServerVersion.version.label("version"),
+            SqlMCPServerVersion.status.label("status"),
+            sa.func
+            .row_number()
+            .over(
+                partition_by=(SqlMCPServerVersion.workspace, SqlMCPServerVersion.name),
+                order_by=(
+                    SqlMCPServerVersion.created_at.desc(),
+                    SqlMCPServerVersion.version.desc(),
+                ),
+            )
+            .label("row_num"),
+        ).where(SqlMCPServerVersion.status.notin_([MCPStatus.DRAFT.value, MCPStatus.DELETED.value]))
+
+    @classmethod
+    def resolved_status_expression(cls):
+        """Build a SQL expression for the resolved status, usable in .filter().
+
+        Uses correlated subqueries: if latest_version is pinned, use that
+        version's status; otherwise, use the most recent eligible version's status.
+        """
+        candidates = cls._latest_candidates_query().subquery("resolved_status_candidates")
+        pinned_status = (
             sa
-            .select(
-                SqlMCPServerVersion.workspace.label("workspace"),
-                SqlMCPServerVersion.name.label("name"),
-                SqlMCPServerVersion.version.label("version"),
-                SqlMCPServerVersion.status.label("status"),
-                sa.func
-                .row_number()
-                .over(
-                    partition_by=(SqlMCPServerVersion.workspace, SqlMCPServerVersion.name),
-                    order_by=(
-                        SqlMCPServerVersion.created_at.desc(),
-                        SqlMCPServerVersion.version.desc(),
-                    ),
-                )
-                .label("row_num"),
-            )
+            .select(SqlMCPServerVersion.status)
             .where(
-                SqlMCPServerVersion.status.notin_([MCPStatus.DRAFT.value, MCPStatus.DELETED.value])
+                sa.and_(
+                    SqlMCPServerVersion.workspace == cls.workspace,
+                    SqlMCPServerVersion.name == cls.name,
+                    SqlMCPServerVersion.version == cls.latest_version,
+                )
             )
-            .subquery("mcp_latest_candidates")
+            .correlate(cls)
+            .scalar_subquery()
+        )
+        fallback_status = (
+            sa
+            .select(candidates.c.status)
+            .where(
+                sa.and_(
+                    candidates.c.workspace == cls.workspace,
+                    candidates.c.name == cls.name,
+                    candidates.c.row_num == 1,
+                )
+            )
+            .correlate(cls)
+            .scalar_subquery()
+        )
+        # CASE (not COALESCE): a stale pin should resolve to NULL
+        # rather than silently falling back to the latest candidate.
+        return sa.case(
+            (cls.latest_version.is_not(None), pinned_status),
+            else_=fallback_status,
         )
 
-        # CASE (not COALESCE) is intentional: a stale pin should resolve
-        # to NULL rather than silently falling back to the latest candidate.
+    @classmethod
+    def with_resolved_latest(cls, query):
+        pinned_version = aliased(SqlMCPServerVersion, name="pinned_mcp_server_version")
+        latest_candidates = cls._latest_candidates_query().subquery("mcp_latest_candidates")
+
         def _pinned_or_fallback(pinned_col, fallback_col):
             return sa.case(
                 (cls.latest_version.is_not(None), pinned_col),
