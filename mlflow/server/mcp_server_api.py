@@ -1,0 +1,688 @@
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
+
+from mlflow.entities.mcp_access_binding import MCPAccessBinding
+from mlflow.entities.mcp_server import MCPRemoteTransportType, MCPServer, MCPStatus, MCPTool
+from mlflow.entities.mcp_server_version import MCPServerVersion
+from mlflow.exceptions import MlflowException
+
+
+class ServerJSONPayload(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: str
+    version: str
+    title: str | None = None
+    description: str | None = None
+    packages: list[dict[str, Any]] | None = None
+    remotes: list[dict[str, Any]] | None = None
+    repository: str | None = None
+    websiteUrl: str | None = None
+    meta: dict[str, Any] | None = Field(None, alias="_meta")
+
+
+class MCPToolPayload(BaseModel):
+    name: str
+    title: str | None = None
+    description: str | None = None
+    inputSchema: dict[str, Any] | None = None
+    outputSchema: dict[str, Any] | None = None
+    annotations: dict[str, Any] | None = None
+    icons: list[dict[str, Any]] | None = None
+    execution: dict[str, Any] | None = None
+
+
+class CreateMCPServerRequest(BaseModel):
+    name: str
+    description: str | None = None
+    icons: list[dict[str, Any]] | None = None
+
+
+class UpdateMCPServerRequest(BaseModel):
+    display_name: str | None = None
+    description: str | None = None
+    icons: list[dict[str, Any]] | None = None
+    latest_version: str | None = None
+
+
+class CreateMCPServerVersionRequest(BaseModel):
+    server_json: ServerJSONPayload
+    display_name: str | None = None
+    status: str = "draft"
+    source: str | None = None
+    tools: list[MCPToolPayload] | None = None
+
+
+class UpdateMCPServerVersionRequest(BaseModel):
+    display_name: str | None = None
+    status: str | None = None
+    tools: list[MCPToolPayload] | None = None
+
+
+class CreateMCPAccessBindingRequest(BaseModel):
+    server_version: str | None = None
+    server_alias: str | None = None
+    endpoint_url: str
+    transport_type: str = "streamable-http"
+
+
+class UpdateMCPAccessBindingRequest(BaseModel):
+    server_version: str | None = None
+    server_alias: str | None = None
+    endpoint_url: str | None = None
+    transport_type: str | None = None
+
+
+class SetAliasRequest(BaseModel):
+    alias: str
+    version: str
+
+
+class SetTagRequest(BaseModel):
+    key: str
+    value: str
+
+
+class AliasResponse(BaseModel):
+    alias: str
+    version: str
+
+
+class MCPAccessBindingSummaryResponse(BaseModel):
+    binding_id: int
+    endpoint_url: str
+    transport_type: str = "streamable-http"
+    server_version: str | None = None
+    server_alias: str | None = None
+
+    @classmethod
+    def from_entity(cls, entity: MCPAccessBinding) -> MCPAccessBindingSummaryResponse:
+        return cls(
+            binding_id=entity.binding_id,
+            endpoint_url=entity.endpoint_url,
+            transport_type=str(entity.transport_type),
+            server_version=entity.server_version,
+            server_alias=entity.server_alias,
+        )
+
+
+class MCPServerResponse(BaseModel):
+    name: str
+    display_name: str | None = None
+    description: str | None = None
+    icons: list[dict[str, Any]] | None = None
+    status: str | None = None
+    access_bindings: list[MCPAccessBindingSummaryResponse] = Field(default_factory=list)
+    latest_version: str | None = None
+    aliases: list[AliasResponse] = Field(default_factory=list)
+    tags: dict[str, str] = Field(default_factory=dict)
+    created_by: str | None = None
+    last_updated_by: str | None = None
+    creation_timestamp: int | None = None
+    last_updated_timestamp: int | None = None
+
+    @classmethod
+    def from_entity(cls, entity: MCPServer) -> MCPServerResponse:
+        return cls(
+            name=entity.name,
+            display_name=entity.display_name,
+            description=entity.description,
+            icons=entity.icons,
+            status=str(entity.status) if entity.status else None,
+            access_bindings=[
+                MCPAccessBindingSummaryResponse.from_entity(b) for b in entity.access_bindings
+            ],
+            latest_version=entity.latest_version,
+            aliases=[AliasResponse(alias=k, version=v) for k, v in entity.aliases.items()],
+            tags=entity.tags,
+            created_by=entity.created_by,
+            last_updated_by=entity.last_updated_by,
+            creation_timestamp=entity.creation_timestamp,
+            last_updated_timestamp=entity.last_updated_timestamp,
+        )
+
+
+class MCPServerVersionResponse(BaseModel):
+    name: str
+    version: str
+    server_json: dict[str, Any]
+    display_name: str | None = None
+    status: str = "draft"
+    tools: list[MCPToolPayload] | None = None
+    aliases: list[str] = Field(default_factory=list)
+    tags: dict[str, str] = Field(default_factory=dict)
+    source: str | None = None
+    created_by: str | None = None
+    last_updated_by: str | None = None
+    creation_timestamp: int | None = None
+    last_updated_timestamp: int | None = None
+
+    @classmethod
+    def from_entity(cls, entity: MCPServerVersion) -> MCPServerVersionResponse:
+        tools = None
+        if entity.tools:
+            tools = [MCPToolPayload(**t.to_dict()) for t in entity.tools]
+        return cls(
+            name=entity.name,
+            version=entity.version,
+            server_json=entity.server_json,
+            display_name=entity.display_name,
+            status=str(entity.status),
+            tools=tools,
+            aliases=entity.aliases,
+            tags=entity.tags,
+            source=entity.source,
+            created_by=entity.created_by,
+            last_updated_by=entity.last_updated_by,
+            creation_timestamp=entity.creation_timestamp,
+            last_updated_timestamp=entity.last_updated_timestamp,
+        )
+
+
+class MCPAccessBindingResponse(BaseModel):
+    binding_id: int
+    server_name: str
+    endpoint_url: str
+    transport_type: str = "streamable-http"
+    tools: list[MCPToolPayload] | None = None
+    server_version: str | None = None
+    server_alias: str | None = None
+    created_by: str | None = None
+    last_updated_by: str | None = None
+    creation_timestamp: int | None = None
+    last_updated_timestamp: int | None = None
+
+    @classmethod
+    def from_entity(
+        cls,
+        entity: MCPAccessBinding,
+        tools: list[MCPToolPayload] | None = None,
+    ) -> MCPAccessBindingResponse:
+        return cls(
+            binding_id=entity.binding_id,
+            server_name=entity.server_name,
+            endpoint_url=entity.endpoint_url,
+            transport_type=str(entity.transport_type),
+            tools=tools,
+            server_version=entity.server_version,
+            server_alias=entity.server_alias,
+            created_by=entity.created_by,
+            last_updated_by=entity.last_updated_by,
+            creation_timestamp=entity.creation_timestamp,
+            last_updated_timestamp=entity.last_updated_timestamp,
+        )
+
+
+class SearchMCPServersResponse(BaseModel):
+    mcp_servers: list[MCPServerResponse]
+    next_page_token: str | None = None
+
+
+class SearchMCPServerVersionsResponse(BaseModel):
+    mcp_server_versions: list[MCPServerVersionResponse]
+    next_page_token: str | None = None
+
+
+class SearchMCPAccessBindingsResponse(BaseModel):
+    mcp_access_bindings: list[MCPAccessBindingResponse]
+    next_page_token: str | None = None
+
+
+def _parse_status(value: str | None) -> MCPStatus | None:
+    if value is None:
+        return None
+    try:
+        return MCPStatus(value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status: '{value}'")
+
+
+def _parse_transport_type(value: str) -> MCPRemoteTransportType:
+    try:
+        return MCPRemoteTransportType(value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid transport_type: '{value}'")
+
+
+def _tool_payloads_to_entities(tools: list[MCPToolPayload] | None) -> list[MCPTool] | None:
+    if tools is None:
+        return None
+    return [MCPTool.from_dict(t.model_dump(exclude_none=True)) for t in tools]
+
+
+def _resolve_binding_tools(store, binding: MCPAccessBinding) -> list[MCPToolPayload] | None:
+    try:
+        if binding.server_version:
+            ver = store.get_mcp_server_version(binding.server_name, binding.server_version)
+        elif binding.server_alias:
+            ver = store.get_mcp_server_version_by_alias(binding.server_name, binding.server_alias)
+        else:
+            return None
+        if ver.tools:
+            return [MCPToolPayload(**t.to_dict()) for t in ver.tools]
+    except MlflowException:
+        pass
+    return None
+
+
+mcp_server_router = APIRouter(
+    prefix="/ajax-api/3.0/mlflow/mcp-servers",
+    tags=["MCP Server Registry"],
+)
+
+
+@mcp_server_router.post("/", response_model=MCPServerResponse)
+def create_mcp_server(request: CreateMCPServerRequest) -> MCPServerResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        server = _get_tracking_store().create_mcp_server(
+            name=request.name,
+            description=request.description,
+            icons=request.icons,
+        )
+        return MCPServerResponse.from_entity(server)
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.get("/", response_model=SearchMCPServersResponse)
+def search_mcp_servers(
+    filter_string: str | None = Query(None),
+    max_results: int = Query(100),
+    order_by: list[str] | None = Query(None),
+    page_token: str | None = Query(None),
+) -> SearchMCPServersResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        results = _get_tracking_store().search_mcp_servers(
+            filter_string=filter_string,
+            max_results=max_results,
+            order_by=order_by,
+            page_token=page_token,
+        )
+        return SearchMCPServersResponse(
+            mcp_servers=[MCPServerResponse.from_entity(s) for s in results],
+            next_page_token=results.token,
+        )
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+# Static route — must be registered before /{name:path} routes
+@mcp_server_router.get("/bindings", response_model=SearchMCPAccessBindingsResponse)
+def search_all_access_bindings(
+    filter_string: str | None = Query(None),
+    max_results: int = Query(100),
+    order_by: list[str] | None = Query(None),
+    page_token: str | None = Query(None),
+    server_version: str | None = Query(None),
+    server_alias: str | None = Query(None),
+) -> SearchMCPAccessBindingsResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        store = _get_tracking_store()
+        results = store.search_mcp_access_bindings(
+            filter_string=filter_string,
+            max_results=max_results,
+            order_by=order_by,
+            page_token=page_token,
+            server_version=server_version,
+            server_alias=server_alias,
+        )
+        bindings = [
+            MCPAccessBindingResponse.from_entity(b, _resolve_binding_tools(store, b))
+            for b in results
+        ]
+        return SearchMCPAccessBindingsResponse(
+            mcp_access_bindings=bindings,
+            next_page_token=results.token,
+        )
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.post("/{name:path}/versions/{version}/tags")
+def set_mcp_server_version_tag(name: str, version: str, request: SetTagRequest) -> dict[str, Any]:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        _get_tracking_store().set_mcp_server_version_tag(
+            name=name, version=version, key=request.key, value=request.value
+        )
+        return {}
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.delete("/{name:path}/versions/{version}/tags/{key}")
+def delete_mcp_server_version_tag(name: str, version: str, key: str) -> dict[str, Any]:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        _get_tracking_store().delete_mcp_server_version_tag(name=name, version=version, key=key)
+        return {}
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.get("/{name:path}/versions/latest", response_model=MCPServerVersionResponse)
+def get_latest_mcp_server_version(name: str) -> MCPServerVersionResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        version = _get_tracking_store().get_latest_mcp_server_version(name)
+        return MCPServerVersionResponse.from_entity(version)
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.get("/{name:path}/versions/{version}", response_model=MCPServerVersionResponse)
+def get_mcp_server_version(name: str, version: str) -> MCPServerVersionResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        ver = _get_tracking_store().get_mcp_server_version(name, version)
+        return MCPServerVersionResponse.from_entity(ver)
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.patch("/{name:path}/versions/{version}", response_model=MCPServerVersionResponse)
+def update_mcp_server_version(
+    name: str, version: str, request: UpdateMCPServerVersionRequest
+) -> MCPServerVersionResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        status = _parse_status(request.status)
+        tools = _tool_payloads_to_entities(request.tools)
+        ver = _get_tracking_store().update_mcp_server_version(
+            name=name,
+            version=version,
+            display_name=request.display_name,
+            status=status,
+            tools=tools,
+        )
+        return MCPServerVersionResponse.from_entity(ver)
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.delete("/{name:path}/versions/{version}")
+def delete_mcp_server_version(name: str, version: str) -> dict[str, Any]:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        _get_tracking_store().delete_mcp_server_version(name, version)
+        return {}
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.post("/{name:path}/versions", response_model=MCPServerVersionResponse)
+def create_mcp_server_version(
+    name: str, request: CreateMCPServerVersionRequest
+) -> MCPServerVersionResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    if request.server_json.name != name:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"server_json.name '{request.server_json.name}' "
+                f"does not match path parameter '{name}'"
+            ),
+        )
+    try:
+        status = _parse_status(request.status)
+        tools = _tool_payloads_to_entities(request.tools)
+        server_json = request.server_json.model_dump(by_alias=True, exclude_none=True)
+        ver = _get_tracking_store().create_mcp_server_version(
+            server_json=server_json,
+            display_name=request.display_name,
+            source=request.source,
+            status=status,
+            tools=tools,
+        )
+        return MCPServerVersionResponse.from_entity(ver)
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.get("/{name:path}/versions", response_model=SearchMCPServerVersionsResponse)
+def search_mcp_server_versions(
+    name: str,
+    filter_string: str | None = Query(None),
+    max_results: int = Query(100),
+    order_by: list[str] | None = Query(None),
+    page_token: str | None = Query(None),
+) -> SearchMCPServerVersionsResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        results = _get_tracking_store().search_mcp_server_versions(
+            name=name,
+            filter_string=filter_string,
+            max_results=max_results,
+            order_by=order_by,
+            page_token=page_token,
+        )
+        return SearchMCPServerVersionsResponse(
+            mcp_server_versions=[MCPServerVersionResponse.from_entity(v) for v in results],
+            next_page_token=results.token,
+        )
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.post("/{name:path}/bindings", response_model=MCPAccessBindingResponse)
+def create_mcp_access_binding(
+    name: str, request: CreateMCPAccessBindingRequest
+) -> MCPAccessBindingResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        transport = _parse_transport_type(request.transport_type)
+        store = _get_tracking_store()
+        binding = store.create_mcp_access_binding(
+            server_name=name,
+            endpoint_url=request.endpoint_url,
+            transport_type=transport,
+            server_version=request.server_version,
+            server_alias=request.server_alias,
+        )
+        return MCPAccessBindingResponse.from_entity(binding, _resolve_binding_tools(store, binding))
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.get(
+    "/{name:path}/bindings/{binding_id}",
+    response_model=MCPAccessBindingResponse,
+)
+def get_mcp_access_binding(name: str, binding_id: int) -> MCPAccessBindingResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        store = _get_tracking_store()
+        binding = store.get_mcp_access_binding(name, binding_id)
+        return MCPAccessBindingResponse.from_entity(binding, _resolve_binding_tools(store, binding))
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.patch(
+    "/{name:path}/bindings/{binding_id}",
+    response_model=MCPAccessBindingResponse,
+)
+def update_mcp_access_binding(
+    name: str, binding_id: int, request: UpdateMCPAccessBindingRequest
+) -> MCPAccessBindingResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        transport = (
+            _parse_transport_type(request.transport_type) if request.transport_type else None
+        )
+        store = _get_tracking_store()
+        binding = store.update_mcp_access_binding(
+            server_name=name,
+            binding_id=binding_id,
+            server_version=request.server_version,
+            server_alias=request.server_alias,
+            endpoint_url=request.endpoint_url,
+            transport_type=transport,
+        )
+        return MCPAccessBindingResponse.from_entity(binding, _resolve_binding_tools(store, binding))
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.delete("/{name:path}/bindings/{binding_id}")
+def delete_mcp_access_binding(name: str, binding_id: int) -> dict[str, Any]:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        _get_tracking_store().delete_mcp_access_binding(name, binding_id)
+        return {}
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.get("/{name:path}/bindings", response_model=SearchMCPAccessBindingsResponse)
+def search_server_access_bindings(
+    name: str,
+    filter_string: str | None = Query(None),
+    max_results: int = Query(100),
+    order_by: list[str] | None = Query(None),
+    page_token: str | None = Query(None),
+    server_version: str | None = Query(None),
+    server_alias: str | None = Query(None),
+) -> SearchMCPAccessBindingsResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        store = _get_tracking_store()
+        results = store.search_mcp_access_bindings(
+            server_name=name,
+            filter_string=filter_string,
+            max_results=max_results,
+            order_by=order_by,
+            page_token=page_token,
+            server_version=server_version,
+            server_alias=server_alias,
+        )
+        bindings = [
+            MCPAccessBindingResponse.from_entity(b, _resolve_binding_tools(store, b))
+            for b in results
+        ]
+        return SearchMCPAccessBindingsResponse(
+            mcp_access_bindings=bindings,
+            next_page_token=results.token,
+        )
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.post("/{name:path}/tags")
+def set_mcp_server_tag(name: str, request: SetTagRequest) -> dict[str, Any]:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        _get_tracking_store().set_mcp_server_tag(name=name, key=request.key, value=request.value)
+        return {}
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.delete("/{name:path}/tags/{key}")
+def delete_mcp_server_tag(name: str, key: str) -> dict[str, Any]:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        _get_tracking_store().delete_mcp_server_tag(name=name, key=key)
+        return {}
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.post("/{name:path}/aliases")
+def set_mcp_server_alias(name: str, request: SetAliasRequest) -> dict[str, Any]:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        _get_tracking_store().set_mcp_server_alias(
+            name=name, alias=request.alias, version=request.version
+        )
+        return {}
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.get("/{name:path}/aliases/{alias}", response_model=MCPServerVersionResponse)
+def get_version_by_alias(name: str, alias: str) -> MCPServerVersionResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        version = _get_tracking_store().get_mcp_server_version_by_alias(name, alias)
+        return MCPServerVersionResponse.from_entity(version)
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.delete("/{name:path}/aliases/{alias}")
+def delete_mcp_server_alias(name: str, alias: str) -> dict[str, Any]:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        _get_tracking_store().delete_mcp_server_alias(name=name, alias=alias)
+        return {}
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+# Catch-all — must be registered last so {name:path} doesn't swallow sub-resource routes
+@mcp_server_router.get("/{name:path}", response_model=MCPServerResponse)
+def get_mcp_server(name: str) -> MCPServerResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        server = _get_tracking_store().get_mcp_server(name)
+        return MCPServerResponse.from_entity(server)
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.patch("/{name:path}", response_model=MCPServerResponse)
+def update_mcp_server(name: str, request: UpdateMCPServerRequest) -> MCPServerResponse:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        server = _get_tracking_store().update_mcp_server(
+            name=name,
+            description=request.description,
+            display_name=request.display_name,
+            icons=request.icons,
+            latest_version=request.latest_version,
+        )
+        return MCPServerResponse.from_entity(server)
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
+
+
+@mcp_server_router.delete("/{name:path}")
+def delete_mcp_server(name: str) -> dict[str, Any]:
+    from mlflow.server.handlers import _get_tracking_store
+
+    try:
+        _get_tracking_store().delete_mcp_server(name)
+        return {}
+    except MlflowException as e:
+        raise HTTPException(status_code=e.get_http_status_code(), detail=e.message)
