@@ -1,0 +1,3854 @@
+{
+  "components": {
+    "schemas": {
+      "AliasResponse": {
+        "properties": {
+          "alias": {
+            "title": "Alias",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alias",
+          "version"
+        ],
+        "title": "AliasResponse",
+        "type": "object"
+      },
+      "ConfigResponse": {
+        "properties": {
+          "projects": {
+            "additionalProperties": true,
+            "title": "Projects",
+            "type": "object"
+          },
+          "providers": {
+            "additionalProperties": true,
+            "title": "Providers",
+            "type": "object"
+          }
+        },
+        "title": "ConfigResponse",
+        "type": "object"
+      },
+      "ConfigUpdateRequest": {
+        "properties": {
+          "projects": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projects"
+          },
+          "providers": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Providers"
+          }
+        },
+        "title": "ConfigUpdateRequest",
+        "type": "object"
+      },
+      "CreateMCPAccessBindingRequest": {
+        "properties": {
+          "endpoint_url": {
+            "title": "Endpoint Url",
+            "type": "string"
+          },
+          "server_alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Alias"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
+          },
+          "transport_type": {
+            "default": "streamable-http",
+            "title": "Transport Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint_url"
+        ],
+        "title": "CreateMCPAccessBindingRequest",
+        "type": "object"
+      },
+      "CreateMCPServerRequest": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "icons": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icons"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateMCPServerRequest",
+        "type": "object"
+      },
+      "CreateMCPServerVersionRequest": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "server_json": {
+            "$ref": "#/components/schemas/ServerJSONPayload"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "default": "draft",
+            "title": "Status",
+            "type": "string"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MCPToolPayload"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          }
+        },
+        "required": [
+          "server_json"
+        ],
+        "title": "CreateMCPServerVersionRequest",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Job": {
+        "description": "Pydantic model for job query response.",
+        "properties": {
+          "creation_time": {
+            "title": "Creation Time",
+            "type": "integer"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_name": {
+            "title": "Job Name",
+            "type": "string"
+          },
+          "last_update_time": {
+            "title": "Last Update Time",
+            "type": "integer"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "result": {
+            "title": "Result"
+          },
+          "retry_count": {
+            "title": "Retry Count",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "status_details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Details"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout"
+          }
+        },
+        "required": [
+          "job_id",
+          "creation_time",
+          "job_name",
+          "params",
+          "timeout",
+          "status",
+          "result",
+          "retry_count",
+          "last_update_time"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "JobStatus": {
+        "description": "Enum for status of a Job.",
+        "enum": [
+          "PENDING",
+          "RUNNING",
+          "SUCCEEDED",
+          "FAILED",
+          "TIMEOUT",
+          "CANCELED"
+        ],
+        "title": "JobStatus",
+        "type": "string"
+      },
+      "MCPAccessBindingResponse": {
+        "properties": {
+          "binding_id": {
+            "title": "Binding Id",
+            "type": "integer"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "creation_timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creation Timestamp"
+          },
+          "endpoint_url": {
+            "title": "Endpoint Url",
+            "type": "string"
+          },
+          "last_updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Updated By"
+          },
+          "last_updated_timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Updated Timestamp"
+          },
+          "server_alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Alias"
+          },
+          "server_name": {
+            "title": "Server Name",
+            "type": "string"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MCPToolPayload"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          },
+          "transport_type": {
+            "default": "streamable-http",
+            "title": "Transport Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "binding_id",
+          "server_name",
+          "endpoint_url"
+        ],
+        "title": "MCPAccessBindingResponse",
+        "type": "object"
+      },
+      "MCPAccessBindingSummaryResponse": {
+        "properties": {
+          "binding_id": {
+            "title": "Binding Id",
+            "type": "integer"
+          },
+          "endpoint_url": {
+            "title": "Endpoint Url",
+            "type": "string"
+          },
+          "server_alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Alias"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
+          },
+          "transport_type": {
+            "default": "streamable-http",
+            "title": "Transport Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "binding_id",
+          "endpoint_url"
+        ],
+        "title": "MCPAccessBindingSummaryResponse",
+        "type": "object"
+      },
+      "MCPServerResponse": {
+        "properties": {
+          "access_bindings": {
+            "items": {
+              "$ref": "#/components/schemas/MCPAccessBindingSummaryResponse"
+            },
+            "title": "Access Bindings",
+            "type": "array"
+          },
+          "aliases": {
+            "items": {
+              "$ref": "#/components/schemas/AliasResponse"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "creation_timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creation Timestamp"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "icons": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icons"
+          },
+          "last_updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Updated By"
+          },
+          "last_updated_timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Updated Timestamp"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "tags": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "MCPServerResponse",
+        "type": "object"
+      },
+      "MCPServerVersionResponse": {
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "creation_timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creation Timestamp"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "last_updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Updated By"
+          },
+          "last_updated_timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Updated Timestamp"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "server_json": {
+            "additionalProperties": true,
+            "title": "Server Json",
+            "type": "object"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "default": "draft",
+            "title": "Status",
+            "type": "string"
+          },
+          "tags": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "object"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MCPToolPayload"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "server_json"
+        ],
+        "title": "MCPServerVersionResponse",
+        "type": "object"
+      },
+      "MCPToolPayload": {
+        "properties": {
+          "annotations": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotations"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "execution": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution"
+          },
+          "icons": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icons"
+          },
+          "inputSchema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputschema"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "outputSchema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputschema"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "MCPToolPayload",
+        "type": "object"
+      },
+      "MessageRequest": {
+        "properties": {
+          "context": {
+            "additionalProperties": true,
+            "title": "Context",
+            "type": "object"
+          },
+          "experiment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experiment Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "MessageRequest",
+        "type": "object"
+      },
+      "MessageResponse": {
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stream_url": {
+            "title": "Stream Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "stream_url"
+        ],
+        "title": "MessageResponse",
+        "type": "object"
+      },
+      "SearchJobPayload": {
+        "properties": {
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params"
+          },
+          "statuses": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statuses"
+          }
+        },
+        "title": "SearchJobPayload",
+        "type": "object"
+      },
+      "SearchJobsResponse": {
+        "description": "Pydantic model for job searching response.",
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "title": "Jobs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "jobs"
+        ],
+        "title": "SearchJobsResponse",
+        "type": "object"
+      },
+      "SearchMCPAccessBindingsResponse": {
+        "properties": {
+          "mcp_access_bindings": {
+            "items": {
+              "$ref": "#/components/schemas/MCPAccessBindingResponse"
+            },
+            "title": "Mcp Access Bindings",
+            "type": "array"
+          },
+          "next_page_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Page Token"
+          }
+        },
+        "required": [
+          "mcp_access_bindings"
+        ],
+        "title": "SearchMCPAccessBindingsResponse",
+        "type": "object"
+      },
+      "SearchMCPServerVersionsResponse": {
+        "properties": {
+          "mcp_server_versions": {
+            "items": {
+              "$ref": "#/components/schemas/MCPServerVersionResponse"
+            },
+            "title": "Mcp Server Versions",
+            "type": "array"
+          },
+          "next_page_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Page Token"
+          }
+        },
+        "required": [
+          "mcp_server_versions"
+        ],
+        "title": "SearchMCPServerVersionsResponse",
+        "type": "object"
+      },
+      "SearchMCPServersResponse": {
+        "properties": {
+          "mcp_servers": {
+            "items": {
+              "$ref": "#/components/schemas/MCPServerResponse"
+            },
+            "title": "Mcp Servers",
+            "type": "array"
+          },
+          "next_page_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Page Token"
+          }
+        },
+        "required": [
+          "mcp_servers"
+        ],
+        "title": "SearchMCPServersResponse",
+        "type": "object"
+      },
+      "ServerJSONPayload": {
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "packages": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Packages"
+          },
+          "remotes": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remotes"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "websiteUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Websiteurl"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "ServerJSONPayload",
+        "type": "object"
+      },
+      "SessionPatchRequest": {
+        "properties": {
+          "status": {
+            "const": "cancelled",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "SessionPatchRequest",
+        "type": "object"
+      },
+      "SessionPatchResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "SessionPatchResponse",
+        "type": "object"
+      },
+      "SetAliasRequest": {
+        "properties": {
+          "alias": {
+            "title": "Alias",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alias",
+          "version"
+        ],
+        "title": "SetAliasRequest",
+        "type": "object"
+      },
+      "SetTagRequest": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "SetTagRequest",
+        "type": "object"
+      },
+      "SkillsInstallRequest": {
+        "properties": {
+          "custom_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Path"
+          },
+          "experiment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experiment Id"
+          },
+          "type": {
+            "default": "global",
+            "enum": [
+              "global",
+              "project",
+              "custom"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "SkillsInstallRequest",
+        "type": "object"
+      },
+      "SkillsInstallResponse": {
+        "properties": {
+          "installed_skills": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Installed Skills",
+            "type": "array"
+          },
+          "skills_directory": {
+            "title": "Skills Directory",
+            "type": "string"
+          }
+        },
+        "required": [
+          "installed_skills",
+          "skills_directory"
+        ],
+        "title": "SkillsInstallResponse",
+        "type": "object"
+      },
+      "SubmitJobPayload": {
+        "properties": {
+          "job_name": {
+            "title": "Job Name",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout"
+          }
+        },
+        "required": [
+          "job_name",
+          "params"
+        ],
+        "title": "SubmitJobPayload",
+        "type": "object"
+      },
+      "UpdateMCPAccessBindingRequest": {
+        "properties": {
+          "endpoint_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint Url"
+          },
+          "server_alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Alias"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
+          },
+          "transport_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transport Type"
+          }
+        },
+        "title": "UpdateMCPAccessBindingRequest",
+        "type": "object"
+      },
+      "UpdateMCPServerRequest": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "icons": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icons"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          }
+        },
+        "title": "UpdateMCPServerRequest",
+        "type": "object"
+      },
+      "UpdateMCPServerVersionRequest": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MCPToolPayload"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          }
+        },
+        "title": "UpdateMCPServerVersionRequest",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "MLflow Tracking Server API",
+    "title": "MLflow Tracking Server",
+    "version": "3.13.1.dev0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/ajax-api/3.0/jobs/": {
+      "post": {
+        "operationId": "submit_job_ajax_api_3_0_jobs__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitJobPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Job",
+        "tags": [
+          "Job"
+        ]
+      }
+    },
+    "/ajax-api/3.0/jobs/cancel/{job_id}": {
+      "patch": {
+        "operationId": "cancel_job_ajax_api_3_0_jobs_cancel__job_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Job",
+        "tags": [
+          "Job"
+        ]
+      }
+    },
+    "/ajax-api/3.0/jobs/search": {
+      "post": {
+        "operationId": "search_jobs_ajax_api_3_0_jobs_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchJobPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchJobsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Jobs",
+        "tags": [
+          "Job"
+        ]
+      }
+    },
+    "/ajax-api/3.0/jobs/{job_id}": {
+      "get": {
+        "operationId": "get_job_ajax_api_3_0_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job",
+        "tags": [
+          "Job"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/assistant/config": {
+      "get": {
+        "description": "Get the current assistant configuration.\n\nReturns:\n    Current configuration including providers and projects.",
+        "operationId": "get_config_ajax_api_3_0_mlflow_assistant_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Config",
+        "tags": [
+          "assistant"
+        ]
+      },
+      "put": {
+        "description": "Update the assistant configuration.\n\nArgs:\n    request: Partial configuration update.\n\nReturns:\n    Updated configuration.",
+        "operationId": "update_config_ajax_api_3_0_mlflow_assistant_config_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Config",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/assistant/message": {
+      "post": {
+        "description": "Send a message to the assistant and get a session for streaming the response.\n\nArgs:\n    request: MessageRequest with message, context, and optional session_id\n\nReturns:\n    MessageResponse with session_id and stream_url",
+        "operationId": "send_message_ajax_api_3_0_mlflow_assistant_message_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send Message",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/assistant/providers/{provider}/health": {
+      "get": {
+        "operationId": "provider_health_check_ajax_api_3_0_mlflow_assistant_providers__provider__health_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Provider Health Check Ajax Api 3 0 Mlflow Assistant Providers  Provider  Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Provider Health Check",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/assistant/providers/{provider}/models": {
+      "get": {
+        "operationId": "list_provider_models_ajax_api_3_0_mlflow_assistant_providers__provider__models_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "base_url",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Base Url"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Provider Models Ajax Api 3 0 Mlflow Assistant Providers  Provider  Models Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Provider Models",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/assistant/sessions/{session_id}": {
+      "patch": {
+        "description": "Update session status.\n\nCurrently supports cancelling an active session, which terminates\nthe running assistant process.\n\nArgs:\n    session_id: The session ID\n    request: SessionPatchRequest with status to set\n\nReturns:\n    SessionPatchResponse indicating success",
+        "operationId": "patch_session_ajax_api_3_0_mlflow_assistant_sessions__session_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionPatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Session",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/assistant/sessions/{session_id}/stream": {
+      "get": {
+        "description": "Stream the assistant's response via Server-Sent Events.\n\nArgs:\n    request: The FastAPI request object\n    session_id: The session ID returned from /message\n\nReturns:\n    StreamingResponse with SSE events",
+        "operationId": "stream_response_ajax_api_3_0_mlflow_assistant_sessions__session_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Response",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/assistant/skills/install": {
+      "post": {
+        "description": "Install skills bundled with MLflow.\nThis endpoint only handles installation. Config updates should be done via PUT /config.\n\nArgs:\n    request: SkillsInstallRequest with type, custom_path, and experiment_id.\n\nReturns:\n    SkillsInstallResponse with installed skill names and directory.\n\nRaises:\n    HTTPException 400: If custom type without custom_path or project type without experiment_id.",
+        "operationId": "install_skills_endpoint_ajax_api_3_0_mlflow_assistant_skills_install_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillsInstallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillsInstallResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Install Skills Endpoint",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/": {
+      "get": {
+        "operationId": "search_mcp_servers_ajax_api_3_0_mlflow_mcp_servers__get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "filter_string",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Filter String"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_results",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Max Results",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Order By"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchMCPServersResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Mcp Servers",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      },
+      "post": {
+        "operationId": "create_mcp_server_ajax_api_3_0_mlflow_mcp_servers__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMCPServerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPServerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Mcp Server",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/bindings": {
+      "get": {
+        "operationId": "search_all_access_bindings_ajax_api_3_0_mlflow_mcp_servers_bindings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "filter_string",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Filter String"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_results",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Max Results",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Order By"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page Token"
+            }
+          },
+          {
+            "in": "query",
+            "name": "server_version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Server Version"
+            }
+          },
+          {
+            "in": "query",
+            "name": "server_alias",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Server Alias"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchMCPAccessBindingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search All Access Bindings",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}": {
+      "delete": {
+        "operationId": "delete_mcp_server_ajax_api_3_0_mlflow_mcp_servers__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Mcp Server Ajax Api 3 0 Mlflow Mcp Servers  Name  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Mcp Server",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      },
+      "get": {
+        "operationId": "get_mcp_server_ajax_api_3_0_mlflow_mcp_servers__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPServerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Mcp Server",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      },
+      "patch": {
+        "operationId": "update_mcp_server_ajax_api_3_0_mlflow_mcp_servers__name__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMCPServerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPServerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Mcp Server",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/aliases": {
+      "post": {
+        "operationId": "set_mcp_server_alias_ajax_api_3_0_mlflow_mcp_servers__name__aliases_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAliasRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Set Mcp Server Alias Ajax Api 3 0 Mlflow Mcp Servers  Name  Aliases Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Mcp Server Alias",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/aliases/{alias}": {
+      "delete": {
+        "operationId": "delete_mcp_server_alias_ajax_api_3_0_mlflow_mcp_servers__name__aliases__alias__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "alias",
+            "required": true,
+            "schema": {
+              "title": "Alias",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Mcp Server Alias Ajax Api 3 0 Mlflow Mcp Servers  Name  Aliases  Alias  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Mcp Server Alias",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      },
+      "get": {
+        "operationId": "get_version_by_alias_ajax_api_3_0_mlflow_mcp_servers__name__aliases__alias__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "alias",
+            "required": true,
+            "schema": {
+              "title": "Alias",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPServerVersionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Version By Alias",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/bindings": {
+      "get": {
+        "operationId": "search_server_access_bindings_ajax_api_3_0_mlflow_mcp_servers__name__bindings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filter_string",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Filter String"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_results",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Max Results",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Order By"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page Token"
+            }
+          },
+          {
+            "in": "query",
+            "name": "server_version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Server Version"
+            }
+          },
+          {
+            "in": "query",
+            "name": "server_alias",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Server Alias"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchMCPAccessBindingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Server Access Bindings",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      },
+      "post": {
+        "operationId": "create_mcp_access_binding_ajax_api_3_0_mlflow_mcp_servers__name__bindings_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMCPAccessBindingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPAccessBindingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Mcp Access Binding",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/bindings/{binding_id}": {
+      "delete": {
+        "operationId": "delete_mcp_access_binding_ajax_api_3_0_mlflow_mcp_servers__name__bindings__binding_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "binding_id",
+            "required": true,
+            "schema": {
+              "title": "Binding Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Mcp Access Binding Ajax Api 3 0 Mlflow Mcp Servers  Name  Bindings  Binding Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Mcp Access Binding",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      },
+      "get": {
+        "operationId": "get_mcp_access_binding_ajax_api_3_0_mlflow_mcp_servers__name__bindings__binding_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "binding_id",
+            "required": true,
+            "schema": {
+              "title": "Binding Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPAccessBindingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Mcp Access Binding",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      },
+      "patch": {
+        "operationId": "update_mcp_access_binding_ajax_api_3_0_mlflow_mcp_servers__name__bindings__binding_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "binding_id",
+            "required": true,
+            "schema": {
+              "title": "Binding Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMCPAccessBindingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPAccessBindingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Mcp Access Binding",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/tags": {
+      "post": {
+        "operationId": "set_mcp_server_tag_ajax_api_3_0_mlflow_mcp_servers__name__tags_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Set Mcp Server Tag Ajax Api 3 0 Mlflow Mcp Servers  Name  Tags Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Mcp Server Tag",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/tags/{key}": {
+      "delete": {
+        "operationId": "delete_mcp_server_tag_ajax_api_3_0_mlflow_mcp_servers__name__tags__key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Mcp Server Tag Ajax Api 3 0 Mlflow Mcp Servers  Name  Tags  Key  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Mcp Server Tag",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/versions": {
+      "get": {
+        "operationId": "search_mcp_server_versions_ajax_api_3_0_mlflow_mcp_servers__name__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filter_string",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Filter String"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_results",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Max Results",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Order By"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchMCPServerVersionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Mcp Server Versions",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      },
+      "post": {
+        "operationId": "create_mcp_server_version_ajax_api_3_0_mlflow_mcp_servers__name__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMCPServerVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPServerVersionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Mcp Server Version",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/versions/latest": {
+      "get": {
+        "operationId": "get_latest_mcp_server_version_ajax_api_3_0_mlflow_mcp_servers__name__versions_latest_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPServerVersionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Latest Mcp Server Version",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/versions/{version}": {
+      "delete": {
+        "operationId": "delete_mcp_server_version_ajax_api_3_0_mlflow_mcp_servers__name__versions__version__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Mcp Server Version Ajax Api 3 0 Mlflow Mcp Servers  Name  Versions  Version  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Mcp Server Version",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      },
+      "get": {
+        "operationId": "get_mcp_server_version_ajax_api_3_0_mlflow_mcp_servers__name__versions__version__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPServerVersionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Mcp Server Version",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      },
+      "patch": {
+        "operationId": "update_mcp_server_version_ajax_api_3_0_mlflow_mcp_servers__name__versions__version__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMCPServerVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPServerVersionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Mcp Server Version",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/versions/{version}/tags": {
+      "post": {
+        "operationId": "set_mcp_server_version_tag_ajax_api_3_0_mlflow_mcp_servers__name__versions__version__tags_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Set Mcp Server Version Tag Ajax Api 3 0 Mlflow Mcp Servers  Name  Versions  Version  Tags Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Mcp Server Version Tag",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/ajax-api/3.0/mlflow/mcp-servers/{name}/versions/{version}/tags/{key}": {
+      "delete": {
+        "operationId": "delete_mcp_server_version_tag_ajax_api_3_0_mlflow_mcp_servers__name__versions__version__tags__key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Mcp Server Version Tag Ajax Api 3 0 Mlflow Mcp Servers  Name  Versions  Version  Tags  Key  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Mcp Server Version Tag",
+        "tags": [
+          "MCP Server Registry"
+        ]
+      }
+    },
+    "/gateway/anthropic/v1/messages": {
+      "post": {
+        "description": "Anthropic passthrough endpoint for the Messages API.\n\nThis endpoint accepts raw Anthropic API format and passes it through to the\nAnthropic provider with the configured API key and model. The 'model' parameter\nin the request specifies which MLflow endpoint to use.\n\nSupports streaming responses when the 'stream' parameter is set to true.\n\nExample:\n    POST /gateway/anthropic/v1/messages\n    {\n        \"model\": \"my-anthropic-endpoint\",\n        \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}],\n        \"max_tokens\": 1024,\n        \"stream\": true\n    }",
+        "operationId": "anthropic_passthrough_messages_gateway_anthropic_v1_messages_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Anthropic Passthrough Messages",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/gateway/gemini/v1beta/models/{endpoint_name}:generateContent": {
+      "post": {
+        "description": "Gemini passthrough endpoint for generateContent API (non-streaming).\n\nThis endpoint accepts raw Gemini API format and passes it through to the\nGemini provider with the configured API key. The endpoint_name in the URL path\nspecifies which MLflow endpoint to use.\n\nExample:\n    POST /gateway/gemini/v1beta/models/my-gemini-endpoint:generateContent\n    {\n        \"contents\": [\n            {\n                \"role\": \"user\",\n                \"parts\": [{\"text\": \"Hello\"}]\n            }\n        ]\n    }",
+        "operationId": "gemini_passthrough_generate_content_gateway_gemini_v1beta_models__endpoint_name__generateContent_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint_name",
+            "required": true,
+            "schema": {
+              "title": "Endpoint Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gemini Passthrough Generate Content",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/gateway/gemini/v1beta/models/{endpoint_name}:streamGenerateContent": {
+      "post": {
+        "description": "Gemini passthrough endpoint for streamGenerateContent API (streaming).\n\nThis endpoint accepts raw Gemini API format and passes it through to the\nGemini provider with the configured API key. The endpoint_name in the URL path\nspecifies which MLflow endpoint to use.\n\nExample:\n    POST /gateway/gemini/v1beta/models/my-gemini-endpoint:streamGenerateContent\n    {\n        \"contents\": [\n            {\n                \"role\": \"user\",\n                \"parts\": [{\"text\": \"Hello\"}]\n            }\n        ]\n    }",
+        "operationId": "gemini_passthrough_stream_generate_content_gateway_gemini_v1beta_models__endpoint_name__streamGenerateContent_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint_name",
+            "required": true,
+            "schema": {
+              "title": "Endpoint Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gemini Passthrough Stream Generate Content",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/gateway/mlflow/v1/chat/completions": {
+      "post": {
+        "description": "OpenAI-compatible chat completions endpoint.\n\nThis endpoint follows the OpenAI API format where the endpoint name is specified\nvia the \"model\" parameter in the request body, allowing clients to use the\nstandard OpenAI SDK.\n\nExample:\n    POST /gateway/mlflow/v1/chat/completions\n    {\n        \"model\": \"my-endpoint-name\",\n        \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}]\n    }",
+        "operationId": "chat_completions_gateway_mlflow_v1_chat_completions_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Chat Completions",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/gateway/openai/v1/chat/completions": {
+      "post": {
+        "description": "OpenAI passthrough endpoint for chat completions.\n\nThis endpoint accepts raw OpenAI API format and passes it through to the\nOpenAI provider with the configured API key and model. The 'model' parameter\nin the request specifies which MLflow endpoint to use.\n\nSupports streaming responses when the 'stream' parameter is set to true.\n\nExample:\n    POST /gateway/openai/v1/chat/completions\n    {\n        \"model\": \"my-openai-endpoint\",\n        \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}],\n        \"temperature\": 0.7,\n        \"stream\": true\n    }",
+        "operationId": "openai_passthrough_chat_gateway_openai_v1_chat_completions_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Openai Passthrough Chat",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/gateway/openai/v1/embeddings": {
+      "post": {
+        "description": "OpenAI passthrough endpoint for embeddings.\n\nThis endpoint accepts raw OpenAI API format and passes it through to the\nOpenAI provider with the configured API key and model. The 'model' parameter\nin the request specifies which MLflow endpoint to use.\n\nExample:\n    POST /gateway/openai/v1/embeddings\n    {\n        \"model\": \"my-openai-endpoint\",\n        \"input\": \"The food was delicious and the waiter...\"\n    }",
+        "operationId": "openai_passthrough_embeddings_gateway_openai_v1_embeddings_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Openai Passthrough Embeddings",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/gateway/openai/v1/responses": {
+      "post": {
+        "description": "OpenAI passthrough endpoint for the Responses API.\n\nThis endpoint accepts raw OpenAI Responses API format and passes it through to the\nOpenAI provider with the configured API key and model. The 'model' parameter\nin the request specifies which MLflow endpoint to use.\n\nSupports streaming responses when the 'stream' parameter is set to true.\n\nExample:\n    POST /gateway/openai/v1/responses\n    {\n        \"model\": \"my-openai-endpoint\",\n        \"input\": [{\"type\": \"text\", \"text\": \"Hello\"}],\n        \"instructions\": \"You are a helpful assistant\",\n        \"stream\": true\n    }",
+        "operationId": "openai_passthrough_responses_gateway_openai_v1_responses_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Openai Passthrough Responses",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/gateway/openai/v1/responses/compact": {
+      "post": {
+        "description": "OpenAI passthrough endpoint for the Responses API ``/compact`` route.\n\nMirrors :func:`openai_passthrough_responses` for session compaction calls\n(e.g. those issued by the OpenAI Agents SDK's ``OpenAIResponsesCompactionSession``).\nCompaction is a unary request \u2014 there is no streaming variant. A request\nthat sets ``stream=true`` is rejected with HTTP 400 to avoid the underlying\nprovider passthrough (which treats all non-embeddings actions as\nstream-capable) attempting an SSE stream against an upstream endpoint that\ndoes not support it.\n\nExample:\n    POST /gateway/openai/v1/responses/compact\n    {\n        \"model\": \"my-openai-endpoint\",\n        \"previous_response_id\": \"resp_abc123\"\n    }",
+        "operationId": "openai_passthrough_responses_compact_gateway_openai_v1_responses_compact_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Openai Passthrough Responses Compact",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/gateway/proxy/{endpoint_name}/{path}": {
+      "post": {
+        "description": "Raw proxy endpoint.\n\nRoutes the request payload as-is to the upstream provider at\n<provider_base_url>/<path>, using the credentials configured for the named\nendpoint. Unlike the typed passthrough routes, the ``model`` field in the\npayload is NOT replaced with the value from the endpoint config.\n\nStreaming is detected automatically from the response Content-Type\n(``text/event-stream`` or ``application/x-ndjson``), so this endpoint\nsupports providers like Gemini that signal streaming via Content-Type rather\nthan a ``\"stream\": true`` request flag.\n\nExample:\n    POST /gateway/proxy/my-openai-endpoint/chat/completions\n    {\n        \"model\": \"gpt-4o\",\n        \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}]\n    }",
+        "operationId": "raw_proxy_gateway_proxy__endpoint_name___path__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint_name",
+            "required": true,
+            "schema": {
+              "title": "Endpoint Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Raw Proxy",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/gateway/{endpoint_name}/mlflow/invocations": {
+      "post": {
+        "description": "Unified invocations endpoint handler that supports both chat and embeddings.\n\nThe handler automatically detects the request type based on the payload structure:\n- If payload has \"messages\" field -> chat endpoint\n- If payload has \"input\" field -> embeddings endpoint",
+        "operationId": "invocations_gateway__endpoint_name__mlflow_invocations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint_name",
+            "required": true,
+            "schema": {
+              "title": "Endpoint Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invocations",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/v1/traces": {
+      "post": {
+        "description": "Export trace spans to MLflow via the OpenTelemetry protocol.\n\nThis endpoint accepts OTLP/HTTP protobuf trace export requests.\nProtobuf format reference: https://opentelemetry.io/docs/specs/otlp/#binary-protobuf-encoding\n\nNote: All spans in the batch are persisted in a single log_spans() call. If that\ncall fails, the entire batch is rejected (all-or-nothing). Partial-success is not\nsupported; clients that need per-trace error isolation should batch by trace.\n\nArgs:\n    request: OTel ExportTraceServiceRequest in protobuf format\n    x_mlflow_experiment_id: Required header containing the experiment ID\n    content_type: Content-Type header from the request\n    content_encoding: Content-Encoding header from the request\n    user_agent: User-Agent header (used to identify MLflow Python client)\n\nReturns:\n    FastAPI Response with ExportTraceServiceResponse in protobuf format\n\nRaises:\n    HTTPException: If the request is invalid or span logging fails",
+        "operationId": "export_traces_v1_traces_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-mlflow-experiment-id",
+            "required": true,
+            "schema": {
+              "title": "X-Mlflow-Experiment-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "content-type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Content-Type"
+            }
+          },
+          {
+            "in": "header",
+            "name": "content-encoding",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Content-Encoding"
+            }
+          },
+          {
+            "in": "header",
+            "name": "User-Agent",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User-Agent"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Traces",
+        "tags": [
+          "OpenTelemetry"
+        ]
+      }
+    }
+  }
+}

@@ -76,6 +76,10 @@ test-examples:
 gateway-api-docs:
 	@python gateway_api_docs.py
 
+.PHONY: mcp-api-docs
+mcp-api-docs:
+	@python mcp_api_docs.py
+
 # Builds only the RST-based documentation (i.e., everything but Java & R docs)
 .PHONY: rsthtml
 rsthtml: gateway-api-docs
