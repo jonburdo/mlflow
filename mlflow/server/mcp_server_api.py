@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, FastAPI, Query
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,11 +21,38 @@ class ServerJSONPayload(BaseModel):
     version: str
     title: str | None = None
     description: str | None = None
-    packages: list[dict[str, Any]] | None = None
-    remotes: list[dict[str, Any]] | None = None
+    packages: list[ServerJSONPackagePayload] | None = None
+    remotes: list[ServerJSONRemotePayload] | None = None
     repository: str | None = None
     websiteUrl: str | None = None
     meta: dict[str, Any] | None = Field(None, alias="_meta")
+
+
+class ServerJSONEnvironmentVariablePayload(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    name: str
+    description: str | None = None
+    isRequired: bool | None = None
+    isSecret: bool | None = None
+
+
+class ServerJSONPackagePayload(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    registryType: str
+    identifier: str
+    transport: Any
+    registryBaseUrl: str | None = None
+    version: str | None = None
+    environmentVariables: list[ServerJSONEnvironmentVariablePayload] | None = None
+
+
+class ServerJSONRemotePayload(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    type: str
+    url: str
 
 
 class MCPToolPayload(BaseModel):
@@ -269,6 +297,42 @@ def _mlflow_error_response(e: MlflowException) -> JSONResponse:
         status_code=e.get_http_status_code(),
         content=json.loads(e.serialize_as_json()),
     )
+
+
+def _format_validation_errors(exc: RequestValidationError) -> str:
+    messages = []
+    for error in exc.errors():
+        if loc := ".".join(str(part) for part in error["loc"] if part != "body"):
+            messages.append(f"{loc}: {error['msg']}")
+        else:
+            messages.append(str(error["msg"]))
+    return "; ".join(messages)
+
+
+def _request_validation_error_response(exc: RequestValidationError) -> JSONResponse:
+    return _mlflow_error_response(
+        MlflowException.invalid_parameter_value(
+            f"Invalid request: {_format_validation_errors(exc)}"
+        )
+    )
+
+
+def add_mcp_server_exception_handlers(fastapi_app: FastAPI) -> None:
+    if getattr(fastapi_app.state, "mcp_server_exception_handlers_added", False):
+        return
+
+    @fastapi_app.exception_handler(RequestValidationError)
+    async def request_validation_error_handler(_request, exc: RequestValidationError):
+        return _request_validation_error_response(exc)
+
+    fastapi_app.state.mcp_server_exception_handlers_added = True
+
+
+def create_mcp_server_fastapi_app() -> FastAPI:
+    fastapi_app = FastAPI()
+    add_mcp_server_exception_handlers(fastapi_app)
+    fastapi_app.include_router(mcp_server_router)
+    return fastapi_app
 
 
 def _tool_payloads_to_entities(tools: list[MCPToolPayload] | None) -> list[MCPTool] | None:

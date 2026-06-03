@@ -6,10 +6,9 @@ from unittest import mock
 from urllib.parse import quote
 
 import pytest
-from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from mlflow.server.mcp_server_api import mcp_server_router
+from mlflow.server.mcp_server_api import create_mcp_server_fastapi_app
 from mlflow.store.tracking.sqlalchemy_store import SqlAlchemyStore
 
 PREFIX = "/ajax-api/3.0/mlflow/mcp-servers"
@@ -34,13 +33,11 @@ def store(tmp_path: Path):
 
 @pytest.fixture
 def client(store):
-    app = FastAPI()
-    app.include_router(mcp_server_router)
     with mock.patch(
         "mlflow.server.handlers._get_tracking_store",
         return_value=store,
     ):
-        yield TestClient(app)
+        yield TestClient(create_mcp_server_fastapi_app())
 
 
 def test_create_server(client):
@@ -174,6 +171,29 @@ def test_create_version_name_mismatch(client):
     assert r.status_code == 400
     assert r.json()["error_code"] == "INVALID_PARAMETER_VALUE"
     assert "does not match" in r.json()["message"]
+
+
+def test_create_version_missing_required_field_returns_mlflow_error(client):
+    r = client.post(PREFIX + "/v-server/versions", json={"server_json": {"name": "v-server"}})
+    assert r.status_code == 400
+    assert r.json()["error_code"] == "INVALID_PARAMETER_VALUE"
+    assert "server_json.version" in r.json()["message"]
+
+
+def test_create_version_invalid_package_shape_returns_mlflow_error(client):
+    r = client.post(
+        PREFIX + "/pkg-server/versions",
+        json={
+            "server_json": {
+                "name": "pkg-server",
+                "version": "1.0",
+                "packages": [{}],
+            }
+        },
+    )
+    assert r.status_code == 400
+    assert r.json()["error_code"] == "INVALID_PARAMETER_VALUE"
+    assert "server_json.packages.0.registryType" in r.json()["message"]
 
 
 def test_create_version_with_tools(client):
@@ -489,12 +509,14 @@ def test_delete_alias(client):
 
 def test_missing_required_field(client):
     r = client.post(PREFIX + "/", json={})
-    assert r.status_code == 422
+    assert r.status_code == 400
+    assert r.json()["error_code"] == "INVALID_PARAMETER_VALUE"
 
 
 def test_invalid_server_json(client):
     r = client.post(PREFIX + "/x/versions", json={"server_json": {"name": "x"}})
-    assert r.status_code == 422
+    assert r.status_code == 400
+    assert r.json()["error_code"] == "INVALID_PARAMETER_VALUE"
 
 
 def test_invalid_status_transition(client):
