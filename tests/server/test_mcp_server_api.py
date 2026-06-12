@@ -240,6 +240,16 @@ def test_create_version_missing_required_field_returns_mlflow_error(client):
     assert "server_json.version" in r.json()["message"]
 
 
+def test_create_version_invalid_semver_returns_mlflow_error(client):
+    r = client.post(
+        f"{PREFIX}/{_encode_path_param('com.example/v-server')}" + "/versions",
+        json={"server_json": {"name": "com.example/v-server", "version": "1.0"}},
+    )
+    assert r.status_code == 400
+    assert r.json()["error_code"] == "INVALID_PARAMETER_VALUE"
+    assert "server_json.version" in r.json()["message"]
+
+
 def test_create_version_invalid_package_shape_returns_mlflow_error(client):
     r = client.post(
         f"{PREFIX}/{_encode_path_param('com.example/pkg-server')}" + "/versions",
@@ -384,6 +394,29 @@ def test_latest_alias_does_not_override_literal_version_route(client):
     assert latest_alias_r.json()["version"] == "2.0.0"
 
 
+def test_latest_alias_returns_highest_active_semver(client):
+    for version in ("1.2.0", "1.10.0"):
+        client.post(
+            f"{PREFIX}/{_encode_path_param('com.example/semver-lat')}" + "/versions",
+            json={
+                "server_json": _server_json("com.example/semver-lat", version),
+                "status": "active",
+            },
+        )
+
+    alias_r = client.get(
+        f"{PREFIX}/{_encode_path_param('com.example/semver-lat')}" + "/aliases/latest"
+    )
+    assert alias_r.status_code == 200
+    assert alias_r.json()["version"] == "1.10.0"
+
+    literal_r = client.get(
+        f"{PREFIX}/{_encode_path_param('com.example/semver-lat')}" + "/versions/1.10.0"
+    )
+    assert literal_r.status_code == 200
+    assert literal_r.json()["version"] == "1.10.0"
+
+
 def test_search_versions(client):
     for v in ["1.0.0", "2.0.0", "3.0.0"]:
         sj = _server_json("com.example/sv", v)
@@ -410,6 +443,41 @@ def test_update_version_status(client):
     )
     assert r.status_code == 200
     assert r.json()["status"] == "active"
+
+
+def test_server_response_recomputes_status_and_latest_after_transitions(client):
+    for version in ("1.0.0", "2.0.0"):
+        client.post(
+            f"{PREFIX}/{_encode_path_param('com.example/status-lat')}" + "/versions",
+            json={
+                "server_json": _server_json("com.example/status-lat", version),
+                "status": "active",
+            },
+        )
+
+    server = client.get(f"{PREFIX}/{_encode_path_param('com.example/status-lat')}").json()
+    assert server["status"] == "active"
+    assert server["latest_version"] == "2.0.0"
+
+    r = client.patch(
+        f"{PREFIX}/{_encode_path_param('com.example/status-lat')}" + "/versions/2.0.0",
+        json={"status": "deprecated"},
+    )
+    assert r.status_code == 200
+
+    server = client.get(f"{PREFIX}/{_encode_path_param('com.example/status-lat')}").json()
+    assert server["status"] == "active"
+    assert server["latest_version"] == "1.0.0"
+
+    r = client.patch(
+        f"{PREFIX}/{_encode_path_param('com.example/status-lat')}" + "/versions/1.0.0",
+        json={"status": "draft"},
+    )
+    assert r.status_code == 200
+
+    server = client.get(f"{PREFIX}/{_encode_path_param('com.example/status-lat')}").json()
+    assert server["status"] == "deprecated"
+    assert server["latest_version"] is None
 
 
 def test_update_version_rejects_null_status(client):

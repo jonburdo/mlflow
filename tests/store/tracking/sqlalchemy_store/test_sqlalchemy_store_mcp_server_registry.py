@@ -191,6 +191,44 @@ def test_get_mcp_server_latest_version_uses_highest_active_semver(store):
     assert updated.latest_version == "1.10.0"
 
 
+def test_resolved_parent_query_prefers_active_over_higher_deprecated_version(store):
+    from mlflow.store.tracking.dbmodels.models import SqlMCPServer
+
+    store.create_mcp_server_version(
+        _server_json("io.github.test/server", "1.0.0"), status=MCPStatus.ACTIVE
+    )
+    store.create_mcp_server_version(
+        _server_json("io.github.test/server", "2.0.0"), status=MCPStatus.DEPRECATED
+    )
+
+    with store.ManagedSessionMaker() as session:
+        query = store._get_query(session, SqlMCPServer).filter(
+            SqlMCPServer.name == "io.github.test/server"
+        )
+        server = SqlMCPServer.with_resolved_latest(query).one()
+        assert server.resolved_status == MCPStatus.ACTIVE.value
+        assert server.resolved_latest_version == "1.0.0"
+
+
+def test_resolved_parent_query_fallback_uses_highest_semver_without_active(store):
+    from mlflow.store.tracking.dbmodels.models import SqlMCPServer
+
+    store.create_mcp_server_version(
+        _server_json("io.github.test/server", "1.0.0"), status=MCPStatus.DEPRECATED
+    )
+    store.create_mcp_server_version(
+        _server_json("io.github.test/server", "2.0.0"), status=MCPStatus.DRAFT
+    )
+
+    with store.ManagedSessionMaker() as session:
+        query = store._get_query(session, SqlMCPServer).filter(
+            SqlMCPServer.name == "io.github.test/server"
+        )
+        server = SqlMCPServer.with_resolved_latest(query).one()
+        assert server.resolved_status == MCPStatus.DRAFT.value
+        assert server.resolved_latest_version is None
+
+
 def test_get_mcp_server_resolved_status(store):
     store.create_mcp_server_version(
         _server_json("io.github.test/s", "1.0.0"), status=MCPStatus.ACTIVE
@@ -391,6 +429,31 @@ def test_get_latest_mcp_server_version_highest_semver_active(store):
     )
     latest = store.get_latest_mcp_server_version("io.github.test/s")
     assert latest.version == "1.10.0"
+
+
+def test_prerelease_semver_resolution_end_to_end(store):
+    for version in ("1.0.0-alpha.2", "1.0.0-alpha.10", "1.0.0-beta.1"):
+        store.create_mcp_server_version(
+            _server_json("io.github.test/s", version), status=MCPStatus.ACTIVE
+        )
+
+    latest = store.get_latest_mcp_server_version("io.github.test/s")
+    assert latest.version == "1.0.0-beta.1"
+
+    server = store.get_mcp_server("io.github.test/s")
+    assert server.latest_version == "1.0.0-beta.1"
+    assert server.status == MCPStatus.ACTIVE
+
+    aliased = store.get_mcp_server_version_by_alias("io.github.test/s", "latest")
+    assert aliased.version == "1.0.0-beta.1"
+
+    binding = store.create_mcp_access_binding(
+        "io.github.test/s",
+        "https://latest.example.com",
+        server_alias="latest",
+    )
+    assert binding.resolved_version is not None
+    assert binding.resolved_version.version == "1.0.0-beta.1"
 
 
 def test_get_latest_mcp_server_version_ignores_non_active_versions(store):
