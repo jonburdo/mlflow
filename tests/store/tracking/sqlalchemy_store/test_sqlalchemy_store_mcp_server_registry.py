@@ -456,6 +456,25 @@ def test_prerelease_semver_resolution_end_to_end(store):
     assert binding.resolved_version.version == "1.0.0-beta.1"
 
 
+def test_prerelease_numeric_tiebreak_applies_to_parent_metadata(store):
+    for version in ("1.0.0-alpha.2", "1.0.0-alpha.10"):
+        store.create_mcp_server_version(
+            _server_json("io.github.test/s", version), status=MCPStatus.ACTIVE
+        )
+
+    latest = store.get_latest_mcp_server_version("io.github.test/s")
+    assert latest.version == "1.0.0-alpha.10"
+
+    server = store.get_mcp_server("io.github.test/s")
+    assert server.latest_version == "1.0.0-alpha.10"
+    assert server.status == MCPStatus.ACTIVE
+
+    searched = store.search_mcp_servers(filter_string="name = 'io.github.test/s'")
+    assert len(searched) == 1
+    assert searched[0].latest_version == "1.0.0-alpha.10"
+    assert searched[0].status == MCPStatus.ACTIVE
+
+
 def test_get_latest_mcp_server_version_ignores_non_active_versions(store):
     store.create_mcp_server_version(_server_json("io.github.test/s", "1.0.0"))
     store.update_mcp_server_version("io.github.test/s", "1.0.0", status=MCPStatus.ACTIVE)

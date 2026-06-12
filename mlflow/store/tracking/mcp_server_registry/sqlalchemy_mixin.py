@@ -118,6 +118,45 @@ class SqlAlchemyMCPServerRegistryMixin:
                 best_version = parsed
         return best_row
 
+    def _get_server_versions_by_name(
+        self, session, server_names: list[str]
+    ) -> dict[str, list[SqlMCPServerVersion]]:
+        if not server_names:
+            return {}
+        version_rows = (
+            self
+            ._mcp_server_version_query(session)
+            .filter(SqlMCPServerVersion.name.in_(server_names))
+            .all()
+        )
+        versions_by_name = {}
+        for row in version_rows:
+            versions_by_name.setdefault(row.name, []).append(row)
+        return versions_by_name
+
+    def _resolve_server_metadata(
+        self, session, servers: list[SqlMCPServer]
+    ) -> dict[str, dict[str, str | None]]:
+        versions_by_name = self._get_server_versions_by_name(
+            session, [server.name for server in servers]
+        )
+        metadata = {}
+        for server in servers:
+            version_rows = versions_by_name.get(server.name, [])
+            active_rows = [row for row in version_rows if row.status == MCPStatus.ACTIVE.value]
+            latest_active = self._pick_highest_semver(active_rows)
+            fallback_rows = [
+                row
+                for row in version_rows
+                if row.status in (MCPStatus.DRAFT.value, MCPStatus.DEPRECATED.value)
+            ]
+            parent_row = latest_active or self._pick_highest_semver(fallback_rows)
+            metadata[server.name] = {
+                "latest_version": (None if latest_active is None else latest_active.version),
+                "status": None if parent_row is None else parent_row.status,
+            }
+        return metadata
+
     def _resolve_binding_target_orm(
         self, session, binding: SqlMCPAccessBinding
     ) -> SqlMCPServerVersion:
@@ -166,8 +205,11 @@ class SqlAlchemyMCPServerRegistryMixin:
                     f"MCP server '{name}' not found",
                     error_code=RESOURCE_DOES_NOT_EXIST,
                 )
+            metadata = self._resolve_server_metadata(session, [server])[server.name]
             return server.to_mlflow_entity(
-                self._get_nested_binding_resolved_versions(session, [server])
+                self._get_nested_binding_resolved_versions(session, [server]),
+                resolved_latest_version=metadata["latest_version"],
+                resolved_status=metadata["status"],
             )
 
     def search_mcp_servers(
@@ -195,7 +237,15 @@ class SqlAlchemyMCPServerRegistryMixin:
                 )
             server_rows = query.all()
             resolved_versions = self._get_nested_binding_resolved_versions(session, server_rows)
-            servers = [server.to_mlflow_entity(resolved_versions) for server in server_rows]
+            metadata_by_name = self._resolve_server_metadata(session, server_rows)
+            servers = [
+                server.to_mlflow_entity(
+                    resolved_versions,
+                    resolved_latest_version=metadata_by_name[server.name]["latest_version"],
+                    resolved_status=metadata_by_name[server.name]["status"],
+                )
+                for server in server_rows
+            ]
             if status_conditions:
                 servers = _apply_server_status_filters(servers, status_conditions)
             if has_bindings_filter is not None:
@@ -227,8 +277,11 @@ class SqlAlchemyMCPServerRegistryMixin:
             server.last_updated_at = get_current_time_millis()
             session.flush()
             server = self._mcp_server_query(session).filter(SqlMCPServer.name == name).one()
+            metadata = self._resolve_server_metadata(session, [server])[server.name]
             return server.to_mlflow_entity(
-                self._get_nested_binding_resolved_versions(session, [server])
+                self._get_nested_binding_resolved_versions(session, [server]),
+                resolved_latest_version=metadata["latest_version"],
+                resolved_status=metadata["status"],
             )
 
     def delete_mcp_server(self, name: str) -> None:
