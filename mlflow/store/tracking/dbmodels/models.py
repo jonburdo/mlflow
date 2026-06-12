@@ -3512,81 +3512,80 @@ class SqlMCPServer(Base):
         ).where(SqlMCPServerVersion.status.in_(list(statuses)))
 
     @classmethod
+    def _resolved_parent_candidates_query(cls):
+        status_priority = sa.case(
+            (SqlMCPServerVersion.status == MCPStatus.ACTIVE.value, 0),
+            else_=1,
+        )
+        return sa.select(
+            SqlMCPServerVersion.workspace.label("workspace"),
+            SqlMCPServerVersion.name.label("name"),
+            SqlMCPServerVersion.version.label("version"),
+            SqlMCPServerVersion.status.label("status"),
+            sa.func
+            .row_number()
+            .over(
+                partition_by=(SqlMCPServerVersion.workspace, SqlMCPServerVersion.name),
+                order_by=(
+                    status_priority.asc(),
+                    SqlMCPServerVersion.version_major.desc(),
+                    SqlMCPServerVersion.version_minor.desc(),
+                    SqlMCPServerVersion.version_patch.desc(),
+                    SqlMCPServerVersion.created_at.desc(),
+                    SqlMCPServerVersion.version.desc(),
+                ),
+            )
+            .label("row_num"),
+        ).where(SqlMCPServerVersion.status != MCPStatus.DELETED.value)
+
+    @classmethod
     def resolved_status_expression(cls):
         """Build a SQL expression for the resolved status, usable in .filter()."""
-        active_candidates_query = cls._latest_candidates_query(statuses={MCPStatus.ACTIVE.value})
-        active_candidates = active_candidates_query.subquery("resolved_status_active_candidates")
-        fallback_candidates_query = cls._latest_candidates_query(
-            statuses={MCPStatus.DRAFT.value, MCPStatus.DEPRECATED.value}
+        parent_candidates = cls._resolved_parent_candidates_query().subquery(
+            "resolved_status_parent_candidates"
         )
-        fallback_candidates = fallback_candidates_query.subquery(
-            "resolved_status_fallback_candidates"
-        )
-        active_status = (
+        return (
             sa
-            .select(active_candidates.c.status)
+            .select(parent_candidates.c.status)
             .where(
                 sa.and_(
-                    active_candidates.c.workspace == cls.workspace,
-                    active_candidates.c.name == cls.name,
-                    active_candidates.c.row_num == 1,
+                    parent_candidates.c.workspace == cls.workspace,
+                    parent_candidates.c.name == cls.name,
+                    parent_candidates.c.row_num == 1,
                 )
             )
             .correlate(cls)
             .scalar_subquery()
         )
-        fallback_status = (
-            sa
-            .select(fallback_candidates.c.status)
-            .where(
-                sa.and_(
-                    fallback_candidates.c.workspace == cls.workspace,
-                    fallback_candidates.c.name == cls.name,
-                    fallback_candidates.c.row_num == 1,
-                )
-            )
-            .correlate(cls)
-            .scalar_subquery()
-        )
-        return sa.func.coalesce(active_status, fallback_status)
 
     @classmethod
     def with_resolved_latest(cls, query):
-        latest_candidates_query = cls._latest_candidates_query(statuses={MCPStatus.ACTIVE.value})
-        latest_candidates = latest_candidates_query.subquery("mcp_latest_candidates")
-        fallback_candidates_query = cls._latest_candidates_query(
-            statuses={MCPStatus.DRAFT.value, MCPStatus.DEPRECATED.value}
+        parent_candidates = cls._resolved_parent_candidates_query().subquery(
+            "mcp_parent_candidates"
         )
-        fallback_candidates = fallback_candidates_query.subquery("mcp_parent_fallback_candidates")
 
-        return (
-            query
-            .outerjoin(
-                latest_candidates,
-                sa.and_(
-                    latest_candidates.c.workspace == cls.workspace,
-                    latest_candidates.c.name == cls.name,
-                    latest_candidates.c.row_num == 1,
+        return query.outerjoin(
+            parent_candidates,
+            sa.and_(
+                parent_candidates.c.workspace == cls.workspace,
+                parent_candidates.c.name == cls.name,
+                parent_candidates.c.row_num == 1,
+            ),
+        ).options(
+            with_expression(
+                cls.resolved_latest_version,
+                sa.case(
+                    (
+                        parent_candidates.c.status == MCPStatus.ACTIVE.value,
+                        parent_candidates.c.version,
+                    ),
+                    else_=None,
                 ),
-            )
-            .outerjoin(
-                fallback_candidates,
-                sa.and_(
-                    fallback_candidates.c.workspace == cls.workspace,
-                    fallback_candidates.c.name == cls.name,
-                    fallback_candidates.c.row_num == 1,
-                ),
-            )
-            .options(
-                with_expression(
-                    cls.resolved_latest_version,
-                    latest_candidates.c.version,
-                ),
-                with_expression(
-                    cls.resolved_status,
-                    sa.func.coalesce(latest_candidates.c.status, fallback_candidates.c.status),
-                ),
-            )
+            ),
+            with_expression(
+                cls.resolved_status,
+                parent_candidates.c.status,
+            ),
         )
 
     def to_mlflow_entity(
