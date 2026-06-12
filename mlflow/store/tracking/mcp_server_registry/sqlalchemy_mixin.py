@@ -40,6 +40,7 @@ from mlflow.utils.search_utils import (
     SearchMCPServerVersionUtils,
     SearchUtils,
 )
+from mlflow.utils.semver_utils import compare_semver, parse_semver
 from mlflow.utils.time import get_current_time_millis
 
 SEARCH_MCP_SERVER_MAX_RESULTS_THRESHOLD = 1000
@@ -90,26 +91,110 @@ class SqlAlchemyMCPServerRegistryMixin:
     def _mcp_server_query(self, session):
         # Eager-load relationships to avoid N+1 lazy loads and DetachedInstanceError
         # if the entity is accessed after the session closes.
-        query = self._get_query(session, SqlMCPServer).options(
+        return self._get_query(session, SqlMCPServer).options(
             subqueryload(SqlMCPServer.tags),
             subqueryload(SqlMCPServer.server_aliases),
             subqueryload(SqlMCPServer.access_bindings),
         )
-        return SqlMCPServer.with_resolved_latest(query)
+
+    def _pick_highest_semver(
+        self, version_rows: list[SqlMCPServerVersion]
+    ) -> SqlMCPServerVersion | None:
+        best_row = None
+        best_version = None
+        for row in version_rows:
+            parsed = parse_semver(row.version, param_name="server_json.version")
+            if best_row is None:
+                best_row = row
+                best_version = parsed
+                continue
+            comparison = compare_semver(parsed, best_version)
+            if comparison > 0 or (
+                comparison == 0
+                and (row.created_at, row.version) > (best_row.created_at, best_row.version)
+            ):
+                best_row = row
+                best_version = parsed
+        return best_row
+
+    def _get_server_versions_by_name(
+        self, session, server_names: list[str]
+    ) -> dict[str, list[SqlMCPServerVersion]]:
+        if not server_names:
+            return {}
+        version_rows = (
+            self
+            ._mcp_server_version_query(session)
+            .filter(SqlMCPServerVersion.name.in_(server_names))
+            .all()
+        )
+        versions_by_name = {}
+        for row in version_rows:
+            versions_by_name.setdefault(row.name, []).append(row)
+        return versions_by_name
+
+    def _resolve_server_metadata(
+        self, session, servers: list[SqlMCPServer]
+    ) -> dict[str, dict[str, str | None]]:
+        versions_by_name = self._get_server_versions_by_name(
+            session, [server.name for server in servers]
+        )
+        metadata = {}
+        for server in servers:
+            version_rows = versions_by_name.get(server.name, [])
+            active_rows = [row for row in version_rows if row.status == MCPStatus.ACTIVE.value]
+            latest_active = self._pick_highest_semver(active_rows)
+            fallback_rows = [
+                row
+                for row in version_rows
+                if row.status in (MCPStatus.DRAFT.value, MCPStatus.DEPRECATED.value)
+            ]
+            parent_row = latest_active or self._pick_highest_semver(fallback_rows)
+            metadata[server.name] = {
+                "latest_version": (None if latest_active is None else latest_active.version),
+                "status": None if parent_row is None else parent_row.status,
+            }
+        return metadata
+
+    def _resolve_binding_target_orm(
+        self, session, binding: SqlMCPAccessBinding
+    ) -> SqlMCPServerVersion:
+        if binding.server_version is not None:
+            return self._get_live_mcp_server_version_or_raise(
+                session, binding.server_name, binding.server_version
+            )
+        if binding.server_alias is not None:
+            return self._get_alias_target_version_or_raise(
+                session, binding.server_name, binding.server_alias
+            )
+        raise MlflowException(
+            f"MCPAccessBinding {binding.binding_id} has no target version or alias",
+            error_code=INVALID_PARAMETER_VALUE,
+        )
 
     def _get_nested_binding_resolved_versions(
         self, session, servers
     ) -> dict[int, MCPServerVersion | None]:
-        binding_ids = [
-            binding.binding_id for server in servers for binding in server.access_bindings
-        ]
-        if not binding_ids:
-            return {}
-        resolved_bindings = self._binding_query_with_version(session, binding_ids=binding_ids).all()
-        return {
-            binding.binding_id: binding.to_mlflow_entity().resolved_version
-            for binding in resolved_bindings
-        }
+        bindings = [binding for server in servers for binding in server.access_bindings]
+        return self._resolve_binding_versions(session, bindings)
+
+    def _resolve_binding_versions(
+        self,
+        session,
+        bindings: list[SqlMCPAccessBinding],
+        *,
+        raise_on_unresolvable: bool = False,
+    ) -> dict[int, MCPServerVersion]:
+        resolved_versions = {}
+        for binding in bindings:
+            try:
+                resolved_versions[binding.binding_id] = self._resolve_binding_target_orm(
+                    session, binding
+                ).to_mlflow_entity()
+            except MlflowException:
+                if raise_on_unresolvable:
+                    raise
+        return resolved_versions
 
     def get_mcp_server(self, name: str) -> MCPServer:
         with self.ManagedSessionMaker() as session:
@@ -119,8 +204,11 @@ class SqlAlchemyMCPServerRegistryMixin:
                     f"MCP server '{name}' not found",
                     error_code=RESOURCE_DOES_NOT_EXIST,
                 )
+            metadata = self._resolve_server_metadata(session, [server])[server.name]
             return server.to_mlflow_entity(
-                self._get_nested_binding_resolved_versions(session, [server])
+                self._get_nested_binding_resolved_versions(session, [server]),
+                resolved_latest_version=metadata["latest_version"],
+                resolved_status=metadata["status"],
             )
 
     def search_mcp_servers(
@@ -140,17 +228,35 @@ class SqlAlchemyMCPServerRegistryMixin:
         offset = SearchUtils.parse_start_offset_from_page_token(page_token)
         with self.ManagedSessionMaker() as session:
             query = self._mcp_server_query(session)
+            status_conditions = []
+            has_bindings_filter = None
             if filter_string:
-                query = _apply_mcp_server_filter(query, filter_string, self._get_dialect())
-            order_clauses = _parse_search_mcp_servers_order_by(order_by)
-            query = query.order_by(*order_clauses).offset(offset).limit(max_results + 1)
+                query, status_conditions, has_bindings_filter = _apply_mcp_server_filter(
+                    query, filter_string, self._get_dialect()
+                )
             server_rows = query.all()
             resolved_versions = self._get_nested_binding_resolved_versions(session, server_rows)
-            servers = [s.to_mlflow_entity(resolved_versions) for s in server_rows]
+            metadata_by_name = self._resolve_server_metadata(session, server_rows)
+            servers = [
+                server.to_mlflow_entity(
+                    resolved_versions,
+                    resolved_latest_version=metadata_by_name[server.name]["latest_version"],
+                    resolved_status=metadata_by_name[server.name]["status"],
+                )
+                for server in server_rows
+            ]
+            if status_conditions:
+                servers = _apply_server_status_filters(servers, status_conditions)
+            if has_bindings_filter is not None:
+                if has_bindings_filter:
+                    servers = [server for server in servers if server.access_bindings]
+                else:
+                    servers = [server for server in servers if not server.access_bindings]
+            servers = _sort_mcp_servers(servers, order_by)
             next_token = None
-            if len(servers) > max_results:
+            if len(servers) > offset + max_results:
                 next_token = SearchUtils.create_page_token(offset + max_results)
-            return PagedList(servers[:max_results], next_token)
+            return PagedList(servers[offset : offset + max_results], next_token)
 
     def update_mcp_server(
         self,
@@ -158,7 +264,6 @@ class SqlAlchemyMCPServerRegistryMixin:
         description: str | None = NOT_SET,
         display_name: str | None = NOT_SET,
         icons: list[MCPIcon] | None = NOT_SET,
-        latest_version: str | None = NOT_SET,
     ) -> MCPServer:
         with self.ManagedSessionMaker(read_only=False) as session:
             server = self._get_entity_or_raise(session, SqlMCPServer, {"name": name}, "MCPServer")
@@ -168,34 +273,14 @@ class SqlAlchemyMCPServerRegistryMixin:
                 server.display_name = display_name
             if icons is not NOT_SET:
                 server.icons = icons
-            if latest_version is not NOT_SET:
-                if latest_version is not None:
-                    sv = (
-                        self
-                        ._get_query(session, SqlMCPServerVersion)
-                        .filter(
-                            SqlMCPServerVersion.name == name,
-                            SqlMCPServerVersion.version == latest_version,
-                        )
-                        .one_or_none()
-                    )
-                    if not sv:
-                        raise MlflowException(
-                            f"Version '{latest_version}' not found on server '{name}'",
-                            error_code=RESOURCE_DOES_NOT_EXIST,
-                        )
-                    if sv.status in (MCPStatus.DRAFT.value, MCPStatus.DELETED.value):
-                        raise MlflowException(
-                            f"Cannot pin latest_version to '{latest_version}' "
-                            f"with status '{sv.status}'",
-                            error_code=INVALID_PARAMETER_VALUE,
-                        )
-                server.latest_version = latest_version
             server.last_updated_at = get_current_time_millis()
             session.flush()
             server = self._mcp_server_query(session).filter(SqlMCPServer.name == name).one()
+            metadata = self._resolve_server_metadata(session, [server])[server.name]
             return server.to_mlflow_entity(
-                self._get_nested_binding_resolved_versions(session, [server])
+                self._get_nested_binding_resolved_versions(session, [server]),
+                resolved_latest_version=metadata["latest_version"],
+                resolved_status=metadata["status"],
             )
 
     def delete_mcp_server(self, name: str) -> None:
@@ -221,6 +306,7 @@ class SqlAlchemyMCPServerRegistryMixin:
                 error_code=INVALID_PARAMETER_VALUE,
             )
         validate_mcp_server_name(name)
+        parsed_version = parse_semver(version, param_name="server_json.version")
 
         now = get_current_time_millis()
         status = status or MCPStatus.DRAFT
@@ -258,6 +344,9 @@ class SqlAlchemyMCPServerRegistryMixin:
                     SqlMCPServerVersion(
                         name=name,
                         version=version,
+                        version_major=parsed_version.major,
+                        version_minor=parsed_version.minor,
+                        version_patch=parsed_version.patch,
                         server_json=server_json,
                         display_name=display_name,
                         status=status.value,
@@ -328,41 +417,14 @@ class SqlAlchemyMCPServerRegistryMixin:
             return self.get_mcp_server_version(name, alias_row.version)
 
     def _resolve_latest_version_orm(self, session, server_name: str) -> SqlMCPServerVersion:
-        """Resolve 'latest' to a SqlMCPServerVersion within an existing session.
-
-        If latest_version is explicitly pinned, resolve to that version only —
-        a stale pin resolves to an error rather than silently falling back to
-        the next candidate (matching resolved_status_expression / with_resolved_latest
-        SQL-level behavior).
-
-        If latest_version is unset, falls back to the most recent non-DRAFT/non-DELETED
-        version (matching _latest_candidates_query ordering for consistency).
-        """
-        server = self._get_entity_or_raise(
-            session, SqlMCPServer, {"name": server_name}, "MCPServer"
+        """Resolve 'latest' to a SqlMCPServerVersion within an existing session."""
+        self._get_entity_or_raise(session, SqlMCPServer, {"name": server_name}, "MCPServer")
+        sv = self._pick_highest_semver(
+            self._latest_eligible_version_query(session, server_name).all()
         )
-        if server.latest_version:
-            sv = (
-                self
-                ._mcp_server_version_query(session)
-                .filter(
-                    SqlMCPServerVersion.name == server_name,
-                    SqlMCPServerVersion.version == server.latest_version,
-                )
-                .one_or_none()
-            )
-            if sv:
-                return sv
-            raise MlflowException(
-                f"Pinned latest_version '{server.latest_version}' not found "
-                f"for MCP server '{server_name}'",
-                error_code=RESOURCE_DOES_NOT_EXIST,
-            )
-
-        sv = self._latest_eligible_version_query(session, server_name).first()
         if not sv:
             raise MlflowException(
-                f"No eligible latest version found for MCP server '{server_name}'",
+                f"No active latest version found for MCP server '{server_name}'",
                 error_code=RESOURCE_DOES_NOT_EXIST,
             )
         return sv
@@ -377,19 +439,18 @@ class SqlAlchemyMCPServerRegistryMixin:
             ._mcp_server_version_query(session)
             .filter(
                 SqlMCPServerVersion.name == server_name,
-                SqlMCPServerVersion.status.notin_([
-                    MCPStatus.DRAFT.value,
-                    MCPStatus.DELETED.value,
-                ]),
+                SqlMCPServerVersion.status == MCPStatus.ACTIVE.value,
             )
             .order_by(
-                SqlMCPServerVersion.created_at.desc(),
+                SqlMCPServerVersion.version_major.desc(),
+                SqlMCPServerVersion.version_minor.desc(),
+                SqlMCPServerVersion.version_patch.desc(),
                 SqlMCPServerVersion.version.desc(),
             )
         )
 
     def _delete_latest_alias_bindings_if_unresolvable(self, session, server_name: str) -> None:
-        """Delete "latest" bindings when no eligible target version remains."""
+        """Delete "latest" bindings when no ACTIVE target version remains."""
         remaining_versions = self._latest_eligible_version_query(session, server_name).first()
         if not remaining_versions:
             (
@@ -442,8 +503,6 @@ class SqlAlchemyMCPServerRegistryMixin:
             if status is not NOT_SET:
                 _validate_status_transition(MCPStatus(sv.status), status)
                 sv.status = status.value
-                if status == MCPStatus.DRAFT and sv.server.latest_version == version:
-                    sv.server.latest_version = None
             if display_name is not NOT_SET:
                 sv.display_name = display_name
             if tools is not NOT_SET:
@@ -452,7 +511,7 @@ class SqlAlchemyMCPServerRegistryMixin:
             sv.last_updated_at = get_current_time_millis()
             session.add(sv)
             session.flush()
-            if status == MCPStatus.DRAFT:
+            if status in {MCPStatus.DRAFT, MCPStatus.DEPRECATED}:
                 self._delete_latest_alias_bindings_if_unresolvable(session, name)
             return sv.to_mlflow_entity()
 
@@ -502,8 +561,6 @@ class SqlAlchemyMCPServerRegistryMixin:
                 )
                 .delete(synchronize_session=False)
             )
-            if sv.server.latest_version == version:
-                sv.server.latest_version = None
             _validate_status_transition(MCPStatus(sv.status), MCPStatus.DELETED)
             sv.status = MCPStatus.DELETED.value
             sv.last_updated_at = get_current_time_millis()
@@ -609,12 +666,12 @@ class SqlAlchemyMCPServerRegistryMixin:
             )
             session.add(binding)
             session.flush()
-            return (
-                self
-                ._binding_query_with_version(session, binding_ids=[binding.binding_id])
-                .one()
-                .to_mlflow_entity()
+            resolved_versions = self._resolve_binding_versions(
+                session, [binding], raise_on_unresolvable=True
             )
+            binding_entity = binding.to_mlflow_entity()
+            binding_entity.resolved_version = resolved_versions.get(binding.binding_id)
+            return binding_entity
 
     def _binding_query_with_version(
         self,
@@ -651,9 +708,12 @@ class SqlAlchemyMCPServerRegistryMixin:
 
     def get_mcp_access_binding(self, server_name: str, binding_id: int) -> MCPAccessBinding:
         with self.ManagedSessionMaker() as session:
-            binding = self._binding_query_with_version(
-                session, binding_ids=[binding_id]
-            ).one_or_none()
+            binding = (
+                self
+                ._get_query(session, SqlMCPAccessBinding)
+                .filter(SqlMCPAccessBinding.binding_id == binding_id)
+                .one_or_none()
+            )
             if not binding:
                 raise MlflowException(
                     f"MCPAccessBinding {binding_id} not found",
@@ -664,7 +724,12 @@ class SqlAlchemyMCPServerRegistryMixin:
                     f"MCPAccessBinding {binding_id} does not belong to server '{server_name}'",
                     error_code=RESOURCE_DOES_NOT_EXIST,
                 )
-            return binding.to_mlflow_entity()
+            resolved_versions = self._resolve_binding_versions(
+                session, [binding], raise_on_unresolvable=True
+            )
+            binding_entity = binding.to_mlflow_entity()
+            binding_entity.resolved_version = resolved_versions.get(binding.binding_id)
+            return binding_entity
 
     def search_mcp_access_bindings(
         self,
@@ -679,21 +744,35 @@ class SqlAlchemyMCPServerRegistryMixin:
         self._validate_max_results_param(max_results)
         offset = SearchUtils.parse_start_offset_from_page_token(page_token)
         with self.ManagedSessionMaker() as session:
-            query = self._binding_query_with_version(
-                session,
-                server_name=server_name,
-                server_version=server_version,
-                server_alias=server_alias,
-            )
+            query = self._get_query(session, SqlMCPAccessBinding)
+            if server_name is not None:
+                query = query.filter(SqlMCPAccessBinding.server_name == server_name)
+            if server_version is not None:
+                query = query.filter(SqlMCPAccessBinding.server_version == server_version)
+            if server_alias is not None:
+                query = query.filter(SqlMCPAccessBinding.server_alias == server_alias)
+            status_conditions = []
             if filter_string:
-                query = _apply_mcp_access_binding_filter(query, filter_string, self._get_dialect())
-            order_clauses = _parse_search_mcp_access_bindings_order_by(order_by)
-            query = query.order_by(*order_clauses).offset(offset).limit(max_results + 1)
-            bindings = [b.to_mlflow_entity() for b in query.all()]
+                query, status_conditions = _apply_mcp_access_binding_filter(
+                    query, filter_string, self._get_dialect()
+                )
+            binding_rows = query.all()
+            resolved_versions = self._resolve_binding_versions(session, binding_rows)
+            bindings = []
+            for binding in binding_rows:
+                resolved_version = resolved_versions.get(binding.binding_id)
+                if resolved_version is None:
+                    continue
+                binding_entity = binding.to_mlflow_entity()
+                binding_entity.resolved_version = resolved_version
+                bindings.append(binding_entity)
+            if status_conditions:
+                bindings = _apply_binding_status_filters(bindings, status_conditions)
+            bindings = _sort_mcp_access_bindings(bindings, order_by)
             next_token = None
-            if len(bindings) > max_results:
+            if len(bindings) > offset + max_results:
                 next_token = SearchUtils.create_page_token(offset + max_results)
-            return PagedList(bindings[:max_results], next_token)
+            return PagedList(bindings[offset : offset + max_results], next_token)
 
     def update_mcp_access_binding(
         self,
@@ -762,14 +841,12 @@ class SqlAlchemyMCPServerRegistryMixin:
             binding.last_updated_at = get_current_time_millis()
             session.add(binding)
             session.flush()
-            bid = binding.binding_id
-            session.expunge(binding)
-            return (
-                self
-                ._binding_query_with_version(session, binding_ids=[bid])
-                .one()
-                .to_mlflow_entity()
+            resolved_versions = self._resolve_binding_versions(
+                session, [binding], raise_on_unresolvable=True
             )
+            binding_entity = binding.to_mlflow_entity()
+            binding_entity.resolved_version = resolved_versions.get(binding.binding_id)
+            return binding_entity
 
     def delete_mcp_access_binding(self, server_name: str, binding_id: int) -> None:
         with self.ManagedSessionMaker(read_only=False) as session:
@@ -1243,28 +1320,6 @@ def _apply_mcp_server_filter(query, filter_string, dialect):
     if attribute_filters:
         query = query.filter(*attribute_filters)
 
-    if status_conditions:
-        resolved_status = SqlMCPServer.resolved_status_expression()
-        for comparator, value in status_conditions:
-            query = query.filter(
-                _get_expression_comparison_func(comparator, dialect)(resolved_status, value)
-            )
-
-    if has_bindings_filter is not None:
-        resolved_binding_targets = _resolved_binding_targets_subquery()
-        live_binding_exists = sa.exists(
-            sa.select(resolved_binding_targets.c.binding_id).where(
-                sa.and_(
-                    resolved_binding_targets.c.binding_workspace == SqlMCPServer.workspace,
-                    resolved_binding_targets.c.binding_server_name == SqlMCPServer.name,
-                )
-            )
-        )
-        if has_bindings_filter:
-            query = query.filter(live_binding_exists)
-        else:
-            query = query.filter(~live_binding_exists)
-
     if tag_filters:
         sql_tag_filters = (sa.and_(*clauses) for clauses in tag_filters.values())
         tag_subquery = (
@@ -1283,11 +1338,12 @@ def _apply_mcp_server_filter(query, filter_string, dialect):
             ),
         )
 
-    return query
+    return query, status_conditions, has_bindings_filter
 
 
 def _apply_mcp_access_binding_filter(query, filter_string, dialect):
     parsed = SearchMCPAccessBindingUtils.parse_search_filter(filter_string)
+    status_conditions = []
     for f in parsed:
         type_ = f["type"]
         key = f["key"]
@@ -1303,9 +1359,104 @@ def _apply_mcp_access_binding_filter(query, filter_string, dialect):
                 f"Invalid comparator '{comparator}' for attribute '{key}'.",
                 error_code=INVALID_PARAMETER_VALUE,
             )
-        attr = SqlMCPServerVersion.status if key == "status" else getattr(SqlMCPAccessBinding, key)
+        if key == "status":
+            status_conditions.append((comparator, value))
+            continue
+        attr = getattr(SqlMCPAccessBinding, key)
         query = query.filter(SearchUtils.get_sql_comparison_func(comparator, dialect)(attr, value))
-    return query
+    return query, status_conditions
+
+
+def _apply_server_status_filters(
+    servers: list[MCPServer], status_conditions: list[tuple[str, Any]]
+) -> list[MCPServer]:
+    filtered_servers = servers
+    for comparator, value in status_conditions:
+        comparison = SearchUtils.get_comparison_func(comparator)
+        filtered_servers = [
+            server
+            for server in filtered_servers
+            if comparison(None if server.status is None else str(server.status), value)
+        ]
+    return filtered_servers
+
+
+def _apply_binding_status_filters(
+    bindings: list[MCPAccessBinding], status_conditions: list[tuple[str, Any]]
+) -> list[MCPAccessBinding]:
+    filtered_bindings = bindings
+    for comparator, value in status_conditions:
+        comparison = SearchUtils.get_comparison_func(comparator)
+        filtered_bindings = [
+            binding
+            for binding in filtered_bindings
+            if binding.resolved_version is not None
+            and comparison(str(binding.resolved_version.status), value)
+        ]
+    return filtered_bindings
+
+
+def _sort_mcp_servers(servers: list[MCPServer], order_by_list: list[str] | None) -> list[MCPServer]:
+    clauses = []
+    if order_by_list:
+        for order_by_clause in order_by_list:
+            token_value, is_ascending = SearchUtils._parse_order_by_string(order_by_clause)
+            key = token_value.strip()
+            if key not in {"name", "created_at", "last_updated_at"}:
+                raise MlflowException(
+                    "Invalid order_by key "
+                    f"'{key}'. Valid keys: {['created_at', 'last_updated_at', 'name']}",
+                    error_code=INVALID_PARAMETER_VALUE,
+                )
+            clauses.append((key, is_ascending))
+    if not any(key == "name" for key, _ in clauses):
+        clauses.append(("name", True))
+
+    def _attr(server: MCPServer, key: str):
+        if key == "created_at":
+            return server.creation_timestamp
+        if key == "last_updated_at":
+            return server.last_updated_timestamp
+        return server.name
+
+    sorted_servers = list(servers)
+    for key, is_ascending in reversed(clauses):
+        sorted_servers.sort(key=lambda server: _attr(server, key), reverse=not is_ascending)
+    return sorted_servers
+
+
+def _sort_mcp_access_bindings(
+    bindings: list[MCPAccessBinding], order_by_list: list[str] | None
+) -> list[MCPAccessBinding]:
+    clauses = []
+    if order_by_list:
+        for order_by_clause in order_by_list:
+            token_value, is_ascending = SearchUtils._parse_order_by_string(order_by_clause)
+            key = token_value.strip()
+            if key not in {"binding_id", "server_name", "created_at", "last_updated_at"}:
+                raise MlflowException(
+                    "Invalid order_by key "
+                    f"'{key}'. Valid keys: "
+                    f"{['binding_id', 'created_at', 'last_updated_at', 'server_name']}",
+                    error_code=INVALID_PARAMETER_VALUE,
+                )
+            clauses.append((key, is_ascending))
+    if not any(key == "binding_id" for key, _ in clauses):
+        clauses.append(("binding_id", True))
+
+    def _attr(binding: MCPAccessBinding, key: str):
+        if key == "created_at":
+            return binding.creation_timestamp
+        if key == "last_updated_at":
+            return binding.last_updated_timestamp
+        if key == "server_name":
+            return binding.server_name
+        return binding.binding_id
+
+    sorted_bindings = list(bindings)
+    for key, is_ascending in reversed(clauses):
+        sorted_bindings.sort(key=lambda binding: _attr(binding, key), reverse=not is_ascending)
+    return sorted_bindings
 
 
 def _parse_search_mcp_servers_order_by(order_by_list):

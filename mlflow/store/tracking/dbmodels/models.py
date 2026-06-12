@@ -24,7 +24,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.inspection import inspect
-from sqlalchemy.orm import aliased, backref, query_expression, relationship, with_expression
+from sqlalchemy.orm import backref, query_expression, relationship, with_expression
 
 from mlflow.entities import (
     Assessment,
@@ -3477,9 +3477,6 @@ class SqlMCPServer(Base):
     display_name = Column(String(256), nullable=True)
     description = Column(Text, nullable=True)
     icons = Column(JSON, nullable=True)
-    # Not a FK to mcp_server_versions to avoid a circular dependency;
-    # stale pins are handled by with_resolved_latest() resolving to NULL.
-    latest_version = Column(String(128), nullable=True)
     resolved_latest_version = query_expression()
     resolved_status = query_expression()
     created_by = Column(String(256), nullable=True)
@@ -3493,7 +3490,7 @@ class SqlMCPServer(Base):
         return f"<SqlMCPServer ({self.name}, {self.workspace})>"
 
     @classmethod
-    def _latest_candidates_query(cls):
+    def _latest_candidates_query(cls, *, statuses):
         return sa.select(
             SqlMCPServerVersion.workspace.label("workspace"),
             SqlMCPServerVersion.name.label("name"),
@@ -3504,29 +3501,35 @@ class SqlMCPServer(Base):
             .over(
                 partition_by=(SqlMCPServerVersion.workspace, SqlMCPServerVersion.name),
                 order_by=(
+                    SqlMCPServerVersion.version_major.desc(),
+                    SqlMCPServerVersion.version_minor.desc(),
+                    SqlMCPServerVersion.version_patch.desc(),
                     SqlMCPServerVersion.created_at.desc(),
                     SqlMCPServerVersion.version.desc(),
                 ),
             )
             .label("row_num"),
-        ).where(SqlMCPServerVersion.status.notin_([MCPStatus.DRAFT.value, MCPStatus.DELETED.value]))
+        ).where(SqlMCPServerVersion.status.in_(list(statuses)))
 
     @classmethod
     def resolved_status_expression(cls):
-        """Build a SQL expression for the resolved status, usable in .filter().
-
-        Uses correlated subqueries: if latest_version is pinned, use that
-        version's status; otherwise, use the most recent eligible version's status.
-        """
-        candidates = cls._latest_candidates_query().subquery("resolved_status_candidates")
-        pinned_status = (
+        """Build a SQL expression for the resolved status, usable in .filter()."""
+        active_candidates_query = cls._latest_candidates_query(statuses={MCPStatus.ACTIVE.value})
+        active_candidates = active_candidates_query.subquery("resolved_status_active_candidates")
+        fallback_candidates_query = cls._latest_candidates_query(
+            statuses={MCPStatus.DRAFT.value, MCPStatus.DEPRECATED.value}
+        )
+        fallback_candidates = fallback_candidates_query.subquery(
+            "resolved_status_fallback_candidates"
+        )
+        active_status = (
             sa
-            .select(SqlMCPServerVersion.status)
+            .select(active_candidates.c.status)
             .where(
                 sa.and_(
-                    SqlMCPServerVersion.workspace == cls.workspace,
-                    SqlMCPServerVersion.name == cls.name,
-                    SqlMCPServerVersion.version == cls.latest_version,
+                    active_candidates.c.workspace == cls.workspace,
+                    active_candidates.c.name == cls.name,
+                    active_candidates.c.row_num == 1,
                 )
             )
             .correlate(cls)
@@ -3534,45 +3537,30 @@ class SqlMCPServer(Base):
         )
         fallback_status = (
             sa
-            .select(candidates.c.status)
+            .select(fallback_candidates.c.status)
             .where(
                 sa.and_(
-                    candidates.c.workspace == cls.workspace,
-                    candidates.c.name == cls.name,
-                    candidates.c.row_num == 1,
+                    fallback_candidates.c.workspace == cls.workspace,
+                    fallback_candidates.c.name == cls.name,
+                    fallback_candidates.c.row_num == 1,
                 )
             )
             .correlate(cls)
             .scalar_subquery()
         )
-        # CASE (not COALESCE): a stale pin should resolve to NULL
-        # rather than silently falling back to the latest candidate.
-        return sa.case(
-            (cls.latest_version.is_not(None), pinned_status),
-            else_=fallback_status,
-        )
+        return sa.func.coalesce(active_status, fallback_status)
 
     @classmethod
     def with_resolved_latest(cls, query):
-        pinned_version = aliased(SqlMCPServerVersion, name="pinned_mcp_server_version")
-        latest_candidates = cls._latest_candidates_query().subquery("mcp_latest_candidates")
-
-        def _pinned_or_fallback(pinned_col, fallback_col):
-            return sa.case(
-                (cls.latest_version.is_not(None), pinned_col),
-                else_=fallback_col,
-            )
+        latest_candidates_query = cls._latest_candidates_query(statuses={MCPStatus.ACTIVE.value})
+        latest_candidates = latest_candidates_query.subquery("mcp_latest_candidates")
+        fallback_candidates_query = cls._latest_candidates_query(
+            statuses={MCPStatus.DRAFT.value, MCPStatus.DEPRECATED.value}
+        )
+        fallback_candidates = fallback_candidates_query.subquery("mcp_parent_fallback_candidates")
 
         return (
             query
-            .outerjoin(
-                pinned_version,
-                sa.and_(
-                    pinned_version.workspace == cls.workspace,
-                    pinned_version.name == cls.name,
-                    pinned_version.version == cls.latest_version,
-                ),
-            )
             .outerjoin(
                 latest_candidates,
                 sa.and_(
@@ -3581,23 +3569,42 @@ class SqlMCPServer(Base):
                     latest_candidates.c.row_num == 1,
                 ),
             )
+            .outerjoin(
+                fallback_candidates,
+                sa.and_(
+                    fallback_candidates.c.workspace == cls.workspace,
+                    fallback_candidates.c.name == cls.name,
+                    fallback_candidates.c.row_num == 1,
+                ),
+            )
             .options(
                 with_expression(
                     cls.resolved_latest_version,
-                    _pinned_or_fallback(pinned_version.version, latest_candidates.c.version),
+                    latest_candidates.c.version,
                 ),
                 with_expression(
                     cls.resolved_status,
-                    _pinned_or_fallback(pinned_version.status, latest_candidates.c.status),
+                    sa.func.coalesce(latest_candidates.c.status, fallback_candidates.c.status),
                 ),
             )
         )
 
-    def to_mlflow_entity(self, resolved_versions_by_binding_id=None):
+    def to_mlflow_entity(
+        self,
+        resolved_versions_by_binding_id=None,
+        *,
+        resolved_latest_version: str | None = None,
+        resolved_status: str | None = None,
+    ):
         tags = {t.key: t.value for t in self.tags}
         aliases = {a.alias: a.version for a in self.server_aliases}
         binding_entities = []
         for binding in self.access_bindings:
+            if (
+                resolved_versions_by_binding_id is not None
+                and binding.binding_id not in resolved_versions_by_binding_id
+            ):
+                continue
             binding_entity = binding.to_mlflow_entity()
             if resolved_versions_by_binding_id is not None:
                 binding_entity.resolved_version = resolved_versions_by_binding_id.get(
@@ -3605,7 +3612,13 @@ class SqlMCPServer(Base):
                 )
             binding_entities.append(binding_entity)
 
-        status = MCPStatus(self.resolved_status) if self.resolved_status is not None else None
+        resolved_latest_version = (
+            self.resolved_latest_version
+            if resolved_latest_version is None
+            else resolved_latest_version
+        )
+        resolved_status = self.resolved_status if resolved_status is None else resolved_status
+        status = MCPStatus(resolved_status) if resolved_status is not None else None
 
         return MCPServer(
             name=self.name,
@@ -3617,7 +3630,7 @@ class SqlMCPServer(Base):
             tags=tags,
             aliases=aliases,
             access_bindings=binding_entities,
-            latest_version=self.latest_version,
+            latest_version=resolved_latest_version,
             created_by=self.created_by,
             last_updated_by=self.last_updated_by,
             creation_timestamp=self.created_at,
@@ -3636,6 +3649,9 @@ class SqlMCPServerVersion(Base):
     )
     name = Column(String(256), nullable=False)
     version = Column(String(128), nullable=False)
+    version_major = Column(Integer, nullable=False)
+    version_minor = Column(Integer, nullable=False)
+    version_patch = Column(Integer, nullable=False)
     server_json = Column(JSON, nullable=False)
     display_name = Column(String(256), nullable=True)
     status = Column(
@@ -3671,8 +3687,9 @@ class SqlMCPServerVersion(Base):
             "workspace",
             "name",
             "status",
-            sa.text("created_at DESC"),
-            sa.text("version DESC"),
+            sa.text("version_major DESC"),
+            sa.text("version_minor DESC"),
+            sa.text("version_patch DESC"),
         ),
     )
 
