@@ -11,6 +11,8 @@ on:
       - .github/actions/setup-node/**
     branches:
       - master
+      - main
+      - rhoai-*
   pull_request:
     types:
       - opened

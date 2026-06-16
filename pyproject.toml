@@ -235,8 +235,8 @@ docs = [
 ]
 
 [tool.uv]
-exclude-newer = "P7D"
-exclude-newer-package = { torch = false, torchvision = false }
+exclude-newer = "P14D"
+exclude-newer-package = { torch = false, torchvision = false, mlflow-kubernetes-plugins = false, starlette = false }
 required-version = ">=0.11.14"
 constraint-dependencies = [
   # xgboost 3.1.0 changed base_score format to vector for multi-output models, breaking shap compatibility
@@ -400,6 +400,7 @@ ignore = [
 "examples/*" = ["T20", "RET504", "E501"]
 "docs/*" = ["T20", "RET504", "E501"]
 "mlflow/*" = ["PT018"]
+"requirements/*" = ["T201", "TID251"]
 
 [tool.ruff.lint.flake8-pytest-style]
 mark-parentheses = false
