@@ -875,6 +875,10 @@
     "defaultMessage": "Git commit",
     "description": "Usage overview > metrics filter > git commit column option label"
   },
+  "2zICpQ": {
+    "defaultMessage": "View all features",
+    "description": "Home page news section view more link"
+  },
   "2zy+D5": {
     "defaultMessage": "Add new tag",
     "description": "Experiment tracking > experiment page > runs > add new tag button"
@@ -2198,10 +2202,6 @@
   "At3XhS": {
     "defaultMessage": "Created Time",
     "description": "Label name for the created time under details tab on the model view page"
-  },
-  "AtT85I": {
-    "defaultMessage": "← Use an endpoint instead",
-    "description": "Link to switch from direct model to endpoint selection"
   },
   "AupQl+": {
     "defaultMessage": "Killed",
@@ -7803,6 +7803,10 @@
     "defaultMessage": "The model version will be copied to {selectedModel} as a new version.",
     "description": "Model registry > OSS Promote model modal > copy explanatory text"
   },
+  "hxn2QP": {
+    "defaultMessage": "Failed to load runs for comparison.",
+    "description": "Compare runs page > Load error state"
+  },
   "hyHL1n": {
     "defaultMessage": "No metrics match the search filter",
     "description": "Message displayed when no metrics match the search filter in the logged model details metrics table"
@@ -8934,6 +8938,10 @@
   "o5AS8R": {
     "defaultMessage": "Custom code judge",
     "description": "Menu item text to create a new custom code judge"
+  },
+  "o7NbW0": {
+    "defaultMessage": "Compare runs page loading",
+    "description": "Compare runs page > Loading state"
   },
   "o7dzKo": {
     "defaultMessage": "Last Modified",
@@ -10210,6 +10218,10 @@
   "vqWexj": {
     "defaultMessage": "Back to experiment list",
     "description": "Tooltip for experiments button"
+  },
+  "vqhfw+": {
+    "defaultMessage": "No runs provided for comparison.",
+    "description": "Compare runs page > Empty input state"
   },
   "vwD2zW": {
     "defaultMessage": "Unified APIs",
