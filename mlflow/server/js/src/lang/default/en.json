@@ -4911,10 +4911,6 @@
     "defaultMessage": "Account",
     "description": "Sidebar account menu item"
   },
-  "RgVN+O": {
-    "defaultMessage": "View all",
-    "description": "Home page news section view more link"
-  },
   "RhQhT4": {
     "defaultMessage": "Model",
     "description": "Label for model name in span details"

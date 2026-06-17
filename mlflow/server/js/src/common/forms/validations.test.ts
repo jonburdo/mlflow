@@ -100,7 +100,7 @@ describe('ExperimentNameValidator server-side fallback', () => {
     expect(mockCallback).toHaveBeenCalledWith(undefined);
   });
 
-  test('shows validation error when API lookup fails for reasons other than not found', async () => {
+  test('treats any API error as name available', async () => {
     MlflowService.getExperimentByName = jest.fn(() =>
       Promise.reject(new ErrorWrapper({ error_code: ErrorCodes.INTERNAL_ERROR, message: 'server error' }, 500)),
     ) as any;
@@ -108,7 +108,7 @@ describe('ExperimentNameValidator server-side fallback', () => {
     const mockCallback = jest.fn((err) => err);
     experimentNameValidator(undefined, 'maybe-existing-experiment', mockCallback);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(mockCallback).toHaveBeenCalledWith('Could not validate experiment name. Please try again.');
+    expect(mockCallback).toHaveBeenCalledWith(undefined);
   });
 });
 

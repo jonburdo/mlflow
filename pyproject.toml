@@ -500,6 +500,8 @@ extend-exclude = [
   "mlflow/utils/gorilla.py",
   # Submodule (typos should be fixed upstream)
   "mlflow/assistant/skills/**/*",
+  # Rebase changelog contains git hashes that trigger false positives
+  "FORK_HISTORY.md",
 ]
 
 [tool.typos.default]
