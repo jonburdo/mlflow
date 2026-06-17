@@ -116,6 +116,12 @@ Additionally, `slow-tests.yml` (Docker model serving tests) and `helm.yml` (Helm
 
 - **`_scope-and-base-controls.scss`**: Removed global `align-self: center` from button override — it fought with form layouts (tags modal `+` button misaligned with inputs) and control bars (`+ New run` misaligned with kebab icon). Replaced with targeted `align-items: center` on the prompts detail action bar container only.
 
+**Upstream test fixes (cherry-picked, tagged `drop:` — will be dropped on next rebase):**
+
+- **`c5527114c`**: Bumps server-readiness retry budgets (10→30 attempts) in webhook and tracking tests.
+- **`5cce4c1da`** + **`c579fd459`**: Adds `.github/actions/cache-hf` to pre-warm HuggingFace dataset cache in CI; skips tests on HTTP 429.
+- **`1115b3e31`** (partial): Fixes `asyncio.get_event_loop()` → `asyncio.run()` in `test_tool_executor.py`. Only the test fix was applied, not the `uv.lock` regen.
+
 ### Late additions to master (merged after initial rebase)
 
 - **PR #281** (`25ffd0263`): `keep: Use sentence case for experiment and prompt UI labels` — merged to master after the rebase was prepared. Integrated via a second `merge -s ours` to link the updated master into the rebase branch.

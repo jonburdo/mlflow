@@ -28,16 +28,16 @@ The ODH MLflow repo is a fork of upstream `mlflow/mlflow`. We carry ~20 downstre
 
 When upstream cuts a new release, we need to reapply our changes on top of it. This skill walks through that process in 8 phases:
 
-| Phase             | What happens                                            | Time estimate |
-| ----------------- | ------------------------------------------------------- | ------------- |
-| 1. Preparation    | Fetch, back up, inventory commits                       | ~10 min       |
-| 2. Squash         | Group 20+ keep commits into 3 clean commits             | ~15 min       |
-| 3. Rebase         | `git rebase --onto` the target tag, resolve conflicts   | ~30 min       |
-| 4. CI fixes       | Fix 5 known recurring issues that break CI every rebase | ~15 min       |
-| 5. Merge strategy | `git merge -s ours` to link histories (no force push)   | ~2 min        |
-| 6. Documentation  | Update FORK_HISTORY.md                                  | ~10 min       |
-| 7. CI validation  | Push, create PR, wait for ~70 CI jobs, fix failures     | ~2 hours      |
-| 8. Real PR        | Create the actual merge PR, get reviews                 | ~1 day        |
+| Phase             | What happens                                           | Time estimate |
+| ----------------- | ------------------------------------------------------ | ------------- |
+| 1. Preparation    | Fetch, back up, inventory commits                      | ~10 min       |
+| 2. Squash         | Group 20+ keep commits into 3 clean commits            | ~15 min       |
+| 3. Rebase         | `git rebase --onto` the target tag, resolve conflicts  | ~30 min       |
+| 4. CI fixes       | Fix recurring issues + cherry-pick upstream test fixes | ~30 min       |
+| 5. Merge strategy | `git merge -s ours` to link histories (no force push)  | ~2 min        |
+| 6. Documentation  | Update FORK_HISTORY.md                                 | ~10 min       |
+| 7. CI validation  | Push, create PR, wait for ~70 CI jobs, fix failures    | ~2 hours      |
+| 8. Real PR        | Create the actual merge PR, get reviews                | ~1 day        |
 
 **You will need:** Push access to `opendatahub-io/mlflow` and the following remotes:
 
@@ -269,7 +269,7 @@ Squash `keep:` commits into 3 categories, in this order:
 
     Update the test expectations to match ODH's implementation, not the other way around.
 
-19. **Commit all fixes together:**
+19. **Commit all ODH-specific fixes together:**
 
     ```bash
     git add -A && git commit -s -m "keep: Post-rebase CI fixes
@@ -282,6 +282,40 @@ Squash `keep:` commits into 3 categories, in this order:
     - Update tests broken by ODH simplifications"
     ```
 
+20. **Cherry-pick upstream flaky test fixes** — v3.13.0 may include tests that fail due to bugs fixed on upstream `master` after the release. These cause CI failures on every PR if not addressed. Check upstream for fixes:
+
+    ```bash
+    git fetch mlflow master
+    # Search for fixes to failing test files
+    git log --oneline mlflow/master --not $UPSTREAM_TAG -- <failing-test-file>
+    ```
+
+    Cherry-pick carefully — avoid full `uv.lock` regenerations. For commits that bundle test fixes with lock file changes, apply only the test file changes manually:
+
+    ```bash
+    # Safe: cherry-pick commits that only touch test files
+    git cherry-pick --no-commit <hash>
+
+    # For commits that also update uv.lock: apply only the test fix
+    sed -i 's/old_pattern/new_pattern/' <test-file>
+    ```
+
+    Commit with `drop:` prefix (these get removed on the next rebase):
+
+    ```bash
+    git commit -s -m "drop: Cherry-pick upstream test fixes for CI stability
+
+    Cherry-picked from upstream master (post-$UPSTREAM_TAG):
+    - <hash> <subject>"
+    ```
+
+    Common upstream flaky tests to check for fixes:
+
+    - `tests/assistant/test_tool_executor.py` — `asyncio.get_event_loop()` → `asyncio.run()`
+    - `tests/gateway/test_tracing_utils.py` — same asyncio pattern
+    - `tests/data/test_huggingface_dataset_and_source.py` — HF Hub rate limits / network issues
+    - `tests/webhooks/test_e2e.py` — server startup timeout too short
+
 **Next:** CI issues are fixed. Move to Phase 5 to prepare the branch for merging.
 
 ---
@@ -292,7 +326,7 @@ Squash `keep:` commits into 3 categories, in this order:
 
 Product security prohibits force pushing. Use the `merge -s ours` strategy:
 
-20. **Link histories:**
+21. **Link histories:**
 
     ```bash
     git merge -s ours upstream/master -m "Automated sync: integrating upstream MLflow $UPSTREAM_TAG"
@@ -310,22 +344,27 @@ Product security prohibits force pushing. Use the `merge -s ours` strategy:
 
 **Goal:** Record everything in FORK_HISTORY.md so the next rebase has full context.
 
-21. **Add a rebase entry to `FORK_HISTORY.md`** documenting:
+22. **Add a rebase entry to `FORK_HISTORY.md`** documenting:
 
     - Dropped commits (with upstream equivalents)
     - Squashed commits by category (with original hashes)
     - Conflict resolutions (file-by-file)
     - Post-rebase CI fixes applied
-    - UI fixes found during visual verification (CSS overrides, layout issues)
+    - UI fixes found during visual verification
     - Test updates for ODH-simplified behavior
+    - Upstream test fixes cherry-picked (with commit hashes)
     - Commits that were missing the `keep:`/`drop:` prefix
 
-    **Keep updating FORK_HISTORY.md throughout the process** — don't wait until the end. Every fix you make after the initial rebase (CI failures, UI regressions, test mismatches) should be added. The next person rebasing needs to know why each change exists.
+    **Keep updating FORK_HISTORY.md throughout the process** — don't wait until the end. Every fix you make after the initial rebase (CI failures, UI regressions, test mismatches, upstream cherry-picks) should be added.
 
-22. **Commit:**
+23. **Commit:**
+
     ```bash
-    git add FORK_HISTORY.md && git commit -s -m "keep: Add rebase documentation"
+    git add FORK_HISTORY.md .claude/skills/rebase-mlflow/skill.md && \
+    git commit -s -m "keep: Post-rebase fixes and documentation"
     ```
+
+    Combine the CI fixes, test fixes, documentation, and skill into a single `keep:` commit. The upstream cherry-picks stay as a separate `drop:` commit.
 
 **Next:** The branch is ready. Move to Phase 7 to validate with CI.
 
@@ -333,15 +372,15 @@ Product security prohibits force pushing. Use the `merge -s ours` strategy:
 
 ## Phase 7: CI Validation
 
-**Goal:** Run the full CI suite (~70 jobs) against the rebase branch to catch issues before the real PR.
+**Goal:** Run CI against the rebase branch to catch issues before the real PR. Most relevant workflows trigger naturally; optionally remove path filters for broader coverage (skip `slow-tests.yml` and `helm.yml` — they test upstream-only features).
 
-23. **Push the clean rebase branch:**
+24. **Push the clean rebase branch:**
 
     ```bash
     git push upstream rebase-$UPSTREAM_TAG
     ```
 
-24. **Create a CI check branch** with workflow path filters removed so all jobs fire:
+25. **Create a CI check branch** with workflow path filters removed so all jobs fire:
 
     ```bash
     git checkout -b ci-check-rebase-$UPSTREAM_TAG rebase-$UPSTREAM_TAG
@@ -363,7 +402,7 @@ Product security prohibits force pushing. Use the `merge -s ours` strategy:
     git push upstream ci-check-rebase-$UPSTREAM_TAG
     ```
 
-25. **Create the CI validation PR — NOT as a draft.** Include collaboration instructions in the body so teammates know how to contribute fixes:
+26. **Create the CI validation PR — NOT as a draft.** Include collaboration instructions in the body so teammates know how to contribute fixes:
 
     ```bash
     gh pr create --repo opendatahub-io/mlflow --base master \
@@ -392,9 +431,9 @@ Product security prohibits force pushing. Use the `merge -s ours` strategy:
 
     **Do NOT use `--draft`.** Most workflows have `if: draft == false` and will skip. Un-drafting later does not re-trigger them (the `ready_for_review` event is not in the triggers).
 
-26. **Monitor CI:** `gh pr checks <PR_NUMBER> --repo opendatahub-io/mlflow`
+27. **Monitor CI:** `gh pr checks <PR_NUMBER> --repo opendatahub-io/mlflow`
 
-27. **If CI fails:** Always fix on the clean branch first, then rebuild ci-check:
+28. **If CI fails:** Always fix on the clean branch first, then rebuild ci-check:
 
     ```bash
     # 1. Fix on the clean branch
@@ -425,7 +464,7 @@ Product security prohibits force pushing. Use the `merge -s ours` strategy:
 
     This keeps ci-check as exactly `rebase-$UPSTREAM_TAG` + one disposable commit.
 
-28. **Close the PR** once all CI passes (do NOT merge).
+29. **Close the PR** once all CI passes (do NOT merge).
 
 **Next:** CI is green. Move to Phase 8 to create the real PR.
 
@@ -435,7 +474,7 @@ Product security prohibits force pushing. Use the `merge -s ours` strategy:
 
 **Goal:** Get the rebase reviewed and merged into master.
 
-29. **Create the real PR:**
+30. **Create the real PR.** The repo requires `## Upstream / Downstream Impact` and `## Testing` sections in the PR body:
 
     ```bash
     gh pr create --repo opendatahub-io/mlflow --base master \
@@ -443,9 +482,25 @@ Product security prohibits force pushing. Use the `merge -s ours` strategy:
       --title "Rebase ODH MLflow onto upstream $UPSTREAM_TAG"
     ```
 
-30. **Get reviews**, then merge. The `merge -s ours` commit ensures the PR diff is clean.
+    Include in the body: summary of commits, what changed, regression check results, and the required template sections:
 
-31. **Cleanup** after merge:
+    ```markdown
+    ## Upstream / Downstream Impact
+
+    - [x] Downstream-only change for `opendatahub-io/mlflow`
+
+    ## Testing
+
+    - [x] CI
+    - [x] Unit tests
+    - [x] Manual testing
+    ```
+
+31. **Get reviews**, then merge. The `merge -s ours` commit ensures the PR diff is clean.
+
+32. **Sync downstream** — after merging, notify the team to sync `red-hat-data-services/mlflow` from midstream before any code freeze deadlines.
+
+33. **Cleanup** after merge:
     - Delete `ci-check-rebase-$UPSTREAM_TAG` branch from upstream
     - Keep `rebase-$UPSTREAM_TAG` and `master-MM-DD` for reference
 
@@ -513,19 +568,34 @@ This keeps the rebase owner in control of the ci-check branch and the final merg
 
 Run through this before creating the real PR:
 
+**Rebase integrity:**
+
 - [ ] Auth plugin compatibility verified
 - [ ] Master backed up to `master-MM-DD`
 - [ ] All `drop:`/`backport:` commits confirmed in target tag
 - [ ] No stray conflict markers (`grep -c '<<<<<<<'`)
 - [ ] TypeScript compiles with zero errors
 - [ ] Key ODH features verified (env vars, gateway decorator, workspace utils, PatternFly overrides)
+
+**Recurring CI fixes applied:**
+
 - [ ] i18n keys synced (`yarn i18n`)
 - [ ] `UV_EXCLUDE_NEWER` set to `P14D` in `.github/actions/setup-python/action.yml`
 - [ ] `uv` version pin compatible with `pyproject.toml` `required-version`
 - [ ] Conftest lint passes for composite actions
 - [ ] `FORK_HISTORY.md` excluded from typos checker in `pyproject.toml`
-- [ ] Prettier run on all modified markdown files
-- [ ] `FORK_HISTORY.md` updated with full changelog
-- [ ] CI validation PR passes (~70 jobs, NOT a draft PR)
+- [ ] Prettier v2 run on all modified markdown files (`uv run pre-commit run prettier`)
+
+**Upstream test fixes:**
+
+- [ ] Upstream flaky test fixes cherry-picked (asyncio, HF cache, webhook retries)
+- [ ] Cherry-picks tagged with `drop:` prefix
+
+**Documentation and validation:**
+
+- [ ] `FORK_HISTORY.md` updated with full changelog (conflicts, fixes, cherry-picks)
+- [ ] Visual verification of federated components (experiments, prompts, run tabs, compare runs)
+- [ ] CI validation PR passes (NOT a draft PR)
 - [ ] All fixes committed on clean `rebase-$UPSTREAM_TAG` branch (not only on ci-check)
-- [ ] Real PR reviewed and merged
+- [ ] Real PR includes required template sections (Upstream/Downstream Impact, Testing)
+- [ ] Team notified to sync `red-hat-data-services/mlflow` after merge
