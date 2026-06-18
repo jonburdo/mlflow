@@ -163,6 +163,11 @@
     align-self: center !important;
   }
 
+  // Prevent buttons from stretching in the prompts detail action bar
+  div:has(> button[data-component-id='mlflow.prompts.details.delete_version']) {
+    align-items: center;
+  }
+
   button.du-bois-light-btn.du-bois-light-btn-link:not(.du-bois-light-btn-icon-only)[data-component-id*='.tag_']:not(
       [data-component-id*='add_tag']
     ),
