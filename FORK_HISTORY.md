@@ -124,7 +124,8 @@ Additionally, `slow-tests.yml` (Docker model serving tests) and `helm.yml` (Helm
 
 ### Late additions to master (merged after initial rebase)
 
-- **PR #281** (`25ffd0263`): `keep: Use sentence case for experiment and prompt UI labels` — merged to master after the rebase was prepared. Integrated via a second `merge -s ours` to link the updated master into the rebase branch.
+- **PR #281** (`25ffd0263`): `keep: Use sentence case for experiment and prompt UI labels`
+- **PR #308** (`490cd77b5`): `keep: add MlflowTraceDetailWrapper for embedded trace view`
 
 ### Notes
 
