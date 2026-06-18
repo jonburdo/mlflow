@@ -13,7 +13,7 @@ jest.mock('../../actions', () => ({
   deleteExperimentApi: jest.fn(() => ({ type: 'action', meta: {}, payload: Promise.resolve({}) })),
 }));
 
-describe('RenameExperimentModal', () => {
+describe('BulkDeleteExperimentModal', () => {
   let minimalProps: any;
 
   beforeEach(() => {
@@ -49,7 +49,7 @@ describe('RenameExperimentModal', () => {
 
   test('should render with minimal props without exploding', async () => {
     renderTestComponent();
-    expect(screen.getByText(/Delete \d+ experiment/)).toBeInTheDocument();
+    expect(screen.getByText(/Delete \d+ Experiment/)).toBeInTheDocument();
   });
 
   test('form submission should result in deleteExperimentApi calls', async () => {

@@ -36,6 +36,8 @@ _TS_VERSION_FILES = [
 
 _R_VERSION_FILES = [Path("mlflow", "R", "mlflow", "DESCRIPTION")]
 
+_HELM_CHART_FILES = [Path("charts", "Chart.yaml")]
+
 
 def get_current_py_version() -> str:
     text = Path("mlflow", "version.py").read_text()
@@ -155,6 +157,14 @@ def replace_java_pom_xml(old_version: str, new_py_version: str, paths: list[Path
     )
 
 
+def replace_helm_chart(new_py_version: str, paths: list[Path]) -> None:
+    replace_occurrences(
+        files=paths,
+        pattern=re.compile(r'^appVersion:\s+".+"$', re.MULTILINE),
+        repl=f'appVersion: "{replace_dev_or_rc_suffix_with(new_py_version, "")}"',
+    )
+
+
 def replace_r(old_py_version: str, new_py_version: str, paths: list[Path]) -> None:
     replace_occurrences(
         files=paths,
@@ -163,12 +173,17 @@ def replace_r(old_py_version: str, new_py_version: str, paths: list[Path]) -> No
     )
 
 
-def update_versions(new_py_version: str) -> None:
+def update_versions(new_py_version: str, helm_app_version: str | None = None) -> None:
     """
     `new_py_version` is either:
       - a release version (e.g. "2.1.0")
       - a RC version (e.g. "2.1.0rc0")
       - a dev version (e.g. "2.1.0.dev0")
+
+    `helm_app_version` overrides the version written to the Helm chart's
+    `appVersion`. The Helm chart's `appVersion` is used as the default Docker
+    image tag, so it must point to a published release. When omitted, falls
+    back to `new_py_version` (with any dev/rc suffix stripped).
     """
     old_py_version = get_current_py_version()
 
@@ -178,6 +193,7 @@ def update_versions(new_py_version: str) -> None:
     replace_java(old_py_version, new_py_version, _JAVA_VERSION_FILES)
     replace_java_pom_xml(old_py_version, new_py_version, _JAVA_POM_XML_FILES)
     replace_r(old_py_version, new_py_version, _R_VERSION_FILES)
+    replace_helm_chart(helm_app_version or new_py_version, _HELM_CHART_FILES)
 
 
 def validate_new_version(value: str) -> str:
@@ -230,7 +246,9 @@ def post_release(new_version: str) -> None:
     new_py_version = (
         f"{new_version_parsed.major}.{new_version_parsed.minor}.{new_version_parsed.micro + 1}.dev0"
     )
-    update_versions(new_py_version=new_py_version)
+    # Helm `appVersion` must point to the released version, not the next dev
+    # version, since it's used as the default Docker image tag.
+    update_versions(new_py_version=new_py_version, helm_app_version=new_version)
 
 
 if __name__ == "__main__":

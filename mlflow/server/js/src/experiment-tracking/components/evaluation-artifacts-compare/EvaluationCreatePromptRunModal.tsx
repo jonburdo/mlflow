@@ -564,7 +564,7 @@ export const EvaluationCreatePromptRunModal = ({
               <div css={{ display: 'flex', justifyContent: 'space-between' }}>
                 <FormUI.Label htmlFor="prompt_template">
                   <FormattedMessage
-                    defaultMessage="Prompt template"
+                    defaultMessage="Prompt Template"
                     description="Experiment page > new run modal > prompt template input label"
                   />
                 </FormUI.Label>
@@ -575,7 +575,7 @@ export const EvaluationCreatePromptRunModal = ({
                   size="small"
                 >
                   <FormattedMessage
-                    defaultMessage="View examples"
+                    defaultMessage="View Examples"
                     description="Experiment page > new run modal > prompt examples button"
                   />
                 </Button>

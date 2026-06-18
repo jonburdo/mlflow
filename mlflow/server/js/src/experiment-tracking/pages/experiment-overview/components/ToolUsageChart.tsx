@@ -68,7 +68,7 @@ export const ToolUsageChart: React.FC = () => {
         <OverviewChartHeader
           icon={<ChartLineIcon />}
           title={
-            <FormattedMessage defaultMessage="Tool usage over time" description="Title for the tool usage chart" />
+            <FormattedMessage defaultMessage="Tool Usage Over Time" description="Title for the tool usage chart" />
           }
         />
         {hasData && (
@@ -99,6 +99,7 @@ export const ToolUsageChart: React.FC = () => {
                   />
                 }
                 cursor={{ fill: theme.colors.actionTertiaryBackgroundHover }}
+                wrapperStyle={{ pointerEvents: 'auto' }}
               />
               {displayedItems.map((toolName) => {
                 const originalIndex = toolNames.indexOf(toolName);

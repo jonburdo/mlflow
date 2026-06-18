@@ -90,13 +90,13 @@ export const TraceCostOverTimeChart: React.FC = () => {
           icon={<ChartLineIcon />}
           title={
             <FormattedMessage
-              defaultMessage="Cost over time"
+              defaultMessage="Cost Over Time"
               description="Title for the cost over time by model chart"
             />
           }
           value={formatCostUSD(totalCost)}
           subtitle={
-            <FormattedMessage defaultMessage="Total cost" description="Subtitle for the cost over time chart total" />
+            <FormattedMessage defaultMessage="Total Cost" description="Subtitle for the cost over time chart total" />
           }
         />
         <div css={{ display: 'flex', gap: theme.spacing.sm, flexShrink: 0 }}>
@@ -135,6 +135,7 @@ export const TraceCostOverTimeChart: React.FC = () => {
                   />
                 }
                 cursor={{ stroke: theme.colors.actionTertiaryBackgroundHover }}
+                wrapperStyle={{ pointerEvents: 'auto' }}
               />
               {displayedItems.map((itemName) => {
                 const originalIndex = dimensionValues.indexOf(itemName);

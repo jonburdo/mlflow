@@ -11,6 +11,7 @@ from opentelemetry.sdk.trace import ReadableSpan as OTelReadableSpan
 
 import mlflow
 from mlflow.entities import (
+    Experiment,
     GatewayBudgetPolicy,
     Issue,
     IssueSeverity,
@@ -51,7 +52,11 @@ from mlflow.entities.trace_metrics import (
     MetricViewType,
 )
 from mlflow.environment_variables import MLFLOW_ENABLE_WORKSPACES
-from mlflow.exceptions import MlflowException, MlflowNotImplementedException
+from mlflow.exceptions import (
+    MlflowException,
+    MlflowNotImplementedException,
+    MlflowTracingException,
+)
 from mlflow.gateway.budget_tracker.in_memory import InMemoryBudgetTracker
 from mlflow.genai.scorers.online.entities import OnlineScoringConfig
 from mlflow.protos.databricks_pb2 import (
@@ -137,7 +142,6 @@ from mlflow.server.handlers import (
     _calculate_trace_filter_correlation,
     _cancel_prompt_optimization_job,
     _convert_path_parameter_to_flask_format,
-    _create_artifact_file_response,
     _create_dataset_handler,
     _create_experiment,
     _create_issue,
@@ -194,7 +198,6 @@ from mlflow.server.handlers import (
     _search_registered_models,
     _search_runs,
     _search_traces_v3,
-    _send_artifact,
     _set_dataset_tags_handler,
     _set_model_version_tag,
     _set_registered_model_alias,
@@ -231,6 +234,7 @@ from mlflow.store.tracking import MAX_RESULTS_QUERY_TRACE_METRICS
 from mlflow.store.tracking.databricks_rest_store import DatabricksTracingRestStore
 from mlflow.telemetry.schemas import Record, Status
 from mlflow.tracing.analysis import TraceFilterCorrelationResult
+from mlflow.tracing.constant import SpansLocation, TraceTagKey
 from mlflow.tracing.utils import build_otel_context
 from mlflow.utils.mlflow_tags import MLFLOW_ARTIFACT_LOCATION
 from mlflow.utils.proto_json_utils import message_to_json
@@ -393,6 +397,49 @@ def test_server_info():
         data = response.get_json()
         assert data["store_type"] == "SqlStore"
         assert data["workspaces_enabled"] is False
+        assert data["trace_archival_enabled"] is False
+
+
+def test_server_info_trace_archival_enabled(monkeypatch):
+    monkeypatch.setattr(
+        "mlflow.server.handlers.get_trace_archival_server_config",
+        mock.Mock(return_value=mock.Mock(enabled=True)),
+    )
+    monkeypatch.setattr("mlflow.server.handlers._store_supports_trace_archival", lambda store: True)
+
+    with app.test_client() as c:
+        response = c.get("/api/3.0/mlflow/server-info")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["trace_archival_enabled"] is True
+
+
+def test_server_info_handles_invalid_trace_archival_config(monkeypatch):
+    monkeypatch.setattr(
+        "mlflow.server.handlers.get_trace_archival_server_config",
+        mock.Mock(
+            side_effect=MlflowException.invalid_parameter_value("invalid trace archival config")
+        ),
+    )
+
+    with app.test_client() as c:
+        response = c.get("/api/3.0/mlflow/server-info")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["trace_archival_enabled"] is False
+
+
+def test_server_info_handles_unexpected_trace_archival_config_error(monkeypatch):
+    monkeypatch.setattr(
+        "mlflow.server.handlers.get_trace_archival_server_config",
+        mock.Mock(side_effect=RuntimeError("unexpected trace archival config error")),
+    )
+
+    with app.test_client() as c:
+        response = c.get("/api/3.0/mlflow/server-info")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["trace_archival_enabled"] is False
 
 
 def test_get_endpoints():
@@ -568,6 +615,7 @@ def test_catch_mlflow_exception():
 
 
 def test_mlflow_server_with_installed_plugin(tmp_path, monkeypatch):
+    pytest.skip("FileStore is no longer supported.")
     from mlflow_test_plugin.file_store import PluginFileStore
 
     monkeypatch.setenv(BACKEND_STORE_URI_ENV_VAR, f"file-plugin:{tmp_path}")
@@ -2010,6 +2058,60 @@ def test_list_scorers(mock_get_request_message, mock_tracking_store):
     assert response_data["scorers"][1]["serialized_scorer"] == "serialized_safety_scorer"
 
 
+def test_list_scorers_cross_experiment(mock_get_request_message, mock_tracking_store):
+    # Empty ``experiment_id`` switches to the cross-experiment branch: the
+    # handler walks ``search_experiments`` via ``page_token`` until exhausted,
+    # then makes a single ``list_scorers_across_experiments`` call with the
+    # collected ids. Mocks below force a 3-page walk so the loop is exercised
+    # end-to-end (not just the first page).
+    mock_get_request_message.return_value = ListScorers()
+
+    def _make_page(items, token):
+        return PagedList(
+            [
+                Experiment(
+                    experiment_id=str(i),
+                    name=f"e-{i}",
+                    artifact_location="",
+                    lifecycle_stage="active",
+                )
+                for i in items
+            ],
+            token,
+        )
+
+    mock_tracking_store.search_experiments.side_effect = [
+        _make_page([1, 2], "tok-1"),
+        _make_page([3], "tok-2"),
+        _make_page([], None),  # terminal page with no token
+    ]
+    mock_tracking_store.list_scorers_across_experiments.return_value = [
+        ScorerVersion(
+            experiment_id=1,
+            scorer_name="alpha",
+            scorer_version=1,
+            serialized_scorer="s",
+            creation_time=0,
+        ),
+    ]
+
+    _list_scorers()
+
+    # ``search_experiments`` is called 3 times: initial + two follow-ups using
+    # the prior page's token. ``list_scorers`` (single-experiment) must NOT be
+    # called on this branch.
+    assert mock_tracking_store.search_experiments.call_count == 3
+    page_tokens = [
+        c.kwargs.get("page_token") for c in mock_tracking_store.search_experiments.call_args_list
+    ]
+    assert page_tokens == [None, "tok-1", "tok-2"]
+    mock_tracking_store.list_scorers.assert_not_called()
+    mock_tracking_store.list_scorers_across_experiments.assert_called_once()
+    # Collected experiment ids: union of every page's items, in order.
+    call_args = mock_tracking_store.list_scorers_across_experiments.call_args
+    assert call_args.args[0] == ["1", "2", "3"]
+
+
 def test_list_scorer_versions(mock_get_request_message, mock_tracking_store):
     experiment_id = "123"
     name = "accuracy_scorer"
@@ -2972,6 +3074,39 @@ def test_get_trace_artifact_handler_with_attachment_path(mock_tracking_store):
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
 
+def test_get_trace_artifact_handler_falls_back_to_archive_repo(mock_tracking_store):
+    trace_id = "tr-test-archive-fallback"
+    trace_info = TraceInfo(
+        trace_id=trace_id,
+        trace_location=EntityTraceLocation.from_experiment_id("3"),
+        request_time=1234567890,
+        execution_duration=4000,
+        state=TraceState.OK,
+        tags={
+            MLFLOW_ARTIFACT_LOCATION: "dbfs:/trace-artifacts",
+            TraceTagKey.SPANS_LOCATION: SpansLocation.ARCHIVE_REPO.value,
+            TraceTagKey.ARCHIVE_LOCATION: "dbfs:/trace-archive",
+        },
+    )
+
+    mock_tracking_store.get_trace.side_effect = MlflowTracingException("archive-backed trace")
+    mock_tracking_store.get_trace_info.return_value = trace_info
+    mock_archive_repo = mock.MagicMock()
+    mock_archive_repo.download_archived_trace_data.return_value = TraceData(spans=[])
+
+    with mock.patch(
+        "mlflow.server.handlers._get_trace_archive_repo", return_value=mock_archive_repo
+    ):
+        with app.test_request_context(method="GET", query_string={"request_id": trace_id}):
+            response = get_trace_artifact_handler()
+
+    mock_tracking_store.get_trace.assert_called_once_with(trace_id, allow_partial=True)
+    mock_tracking_store.get_trace_info.assert_called_once_with(trace_id)
+    mock_archive_repo.download_archived_trace_data.assert_called_once()
+    assert response.status_code == 200
+    assert response.headers["Content-Disposition"] == "attachment; filename=traces.json"
+
+
 def test_get_trace_artifact_handler_attachment_missing_request_id():
     query = {"path": "a1b2c3d4-e5f6-4890-abcd-ef1234567890"}
     with app.test_request_context(method="GET", query_string=query):
@@ -3038,6 +3173,82 @@ def test_delete_trace_tag_v3_handler(mock_get_request_message, mock_tracking_sto
     assert response.status_code == 200
 
 
+@pytest.mark.parametrize(
+    "tag_key",
+    [
+        TraceTagKey.SPANS_LOCATION,
+        TraceTagKey.ARCHIVE_LOCATION,
+    ],
+)
+def test_delete_trace_tag_v2_handler_rejects_archival_immutable_tags(
+    mock_get_request_message, mock_tracking_store, tag_key
+):
+    request_msg = DeleteTraceTag(key=tag_key)
+    mock_get_request_message.return_value = request_msg
+
+    response = _delete_trace_tag(request_id="tr-123v2")
+
+    assert response.status_code == 400
+    response_data = json.loads(response.get_data())
+    assert response_data["error_code"] == ErrorCode.Name(INVALID_PARAMETER_VALUE)
+    assert response_data["message"] == (
+        f"Tag '{tag_key}' is immutable and cannot be deleted on a trace."
+    )
+    mock_tracking_store.delete_trace_tag.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "tag_key",
+    [
+        TraceTagKey.SPANS_LOCATION,
+        TraceTagKey.ARCHIVE_LOCATION,
+    ],
+)
+def test_delete_trace_tag_v3_handler_rejects_archival_immutable_tags(
+    mock_get_request_message, mock_tracking_store, tag_key
+):
+    request_msg = DeleteTraceTagV3(key=tag_key)
+    mock_get_request_message.return_value = request_msg
+
+    response = _delete_trace_tag_v3(trace_id="tr-v3-456")
+
+    assert response.status_code == 400
+    response_data = json.loads(response.get_data())
+    assert response_data["error_code"] == ErrorCode.Name(INVALID_PARAMETER_VALUE)
+    assert response_data["message"] == (
+        f"Tag '{tag_key}' is immutable and cannot be deleted on a trace."
+    )
+    mock_tracking_store.delete_trace_tag.assert_not_called()
+
+
+def test_delete_trace_tag_v2_handler_allows_clearing_archival_failure(
+    mock_get_request_message, mock_tracking_store
+):
+    request_msg = DeleteTraceTag(key=TraceTagKey.ARCHIVAL_FAILURE)
+    mock_get_request_message.return_value = request_msg
+
+    response = _delete_trace_tag(request_id="tr-123v2")
+
+    assert response.status_code == 200
+    mock_tracking_store.delete_trace_tag.assert_called_once_with(
+        "tr-123v2", TraceTagKey.ARCHIVAL_FAILURE
+    )
+
+
+def test_delete_trace_tag_v3_handler_allows_clearing_archival_failure(
+    mock_get_request_message, mock_tracking_store
+):
+    request_msg = DeleteTraceTagV3(key=TraceTagKey.ARCHIVAL_FAILURE)
+    mock_get_request_message.return_value = request_msg
+
+    response = _delete_trace_tag_v3(trace_id="tr-v3-456")
+
+    assert response.status_code == 200
+    mock_tracking_store.delete_trace_tag.assert_called_once_with(
+        "tr-v3-456", TraceTagKey.ARCHIVAL_FAILURE
+    )
+
+
 def test_set_trace_tag_v2_handler(mock_get_request_message, mock_tracking_store):
     """Test v2 set_trace_tag handler with request_id parameter.
 
@@ -3088,6 +3299,52 @@ def test_set_trace_tag_v3_handler(mock_get_request_message, mock_tracking_store)
     # Verify response was created (200 status)
     assert response is not None
     assert response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "tag_key",
+    [
+        TraceTagKey.SPANS_LOCATION,
+        TraceTagKey.ARCHIVE_LOCATION,
+        TraceTagKey.ARCHIVAL_FAILURE,
+    ],
+)
+def test_set_trace_tag_v2_handler_rejects_archival_immutable_tags(
+    mock_get_request_message, mock_tracking_store, tag_key
+):
+    request_msg = SetTraceTag(key=tag_key, value="tv")
+    mock_get_request_message.return_value = request_msg
+
+    response = _set_trace_tag(request_id="tr-test-v2-123")
+
+    assert response.status_code == 400
+    response_data = json.loads(response.get_data())
+    assert response_data["error_code"] == ErrorCode.Name(INVALID_PARAMETER_VALUE)
+    assert response_data["message"] == f"Tag '{tag_key}' is immutable and cannot be set on a trace."
+    mock_tracking_store.set_trace_tag.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "tag_key",
+    [
+        TraceTagKey.SPANS_LOCATION,
+        TraceTagKey.ARCHIVE_LOCATION,
+        TraceTagKey.ARCHIVAL_FAILURE,
+    ],
+)
+def test_set_trace_tag_v3_handler_rejects_archival_immutable_tags(
+    mock_get_request_message, mock_tracking_store, tag_key
+):
+    request_msg = SetTraceTagV3(key=tag_key, value="tv")
+    mock_get_request_message.return_value = request_msg
+
+    response = _set_trace_tag_v3(trace_id="tr-test-v3-456")
+
+    assert response.status_code == 400
+    response_data = json.loads(response.get_data())
+    assert response_data["error_code"] == ErrorCode.Name(INVALID_PARAMETER_VALUE)
+    assert response_data["message"] == f"Tag '{tag_key}' is immutable and cannot be set on a trace."
+    mock_tracking_store.set_trace_tag.assert_not_called()
 
 
 def test_link_prompts_to_trace_handler(mock_get_request_message, mock_tracking_store):
@@ -3740,98 +3997,6 @@ def test_post_ui_telemetry_handler_telemetry_disabled_by_env(
         mock_get_client.assert_not_called()
 
 
-def test_send_artifact_prefers_local_path(tmp_path):
-    artifact_path = "test_model/model.pkl"
-    test_data = b"local artifact"
-    test_file = tmp_path / "model.pkl"
-    test_file.write_bytes(test_data)
-
-    mock_artifact_repo = mock.MagicMock()
-    mock_artifact_repo.get_local_path.return_value = str(test_file)
-
-    with (
-        app.test_request_context(method="GET"),
-        mock.patch("mlflow.server.handlers.tempfile.TemporaryDirectory") as mock_tmp_dir,
-    ):
-        response = _send_artifact(mock_artifact_repo, artifact_path)
-
-    response.direct_passthrough = False
-    assert response.get_data() == test_data
-    assert response.headers["Content-Disposition"] == "attachment; filename=model.pkl"
-    mock_artifact_repo.get_local_path.assert_called_once_with(artifact_path)
-    mock_artifact_repo.download_artifacts.assert_not_called()
-    mock_tmp_dir.assert_not_called()
-
-
-def test_send_artifact_falls_back_to_download_when_local_path_unavailable(tmp_path):
-    artifact_path = "test_model/model.pkl"
-    test_data = b"downloaded artifact"
-    test_file = tmp_path / "model.pkl"
-    test_file.write_bytes(test_data)
-
-    mock_artifact_repo = mock.MagicMock()
-    mock_artifact_repo.get_local_path.return_value = None
-    mock_artifact_repo.download_artifacts.return_value = str(test_file)
-
-    with app.test_request_context(method="GET"):
-        response = _send_artifact(mock_artifact_repo, artifact_path)
-
-    response.direct_passthrough = False
-    assert response.get_data() == test_data
-    assert response.headers["Content-Disposition"] == "attachment; filename=model.pkl"
-    mock_artifact_repo.get_local_path.assert_called_once_with(artifact_path)
-    mock_artifact_repo.download_artifacts.assert_called_once_with(artifact_path, dst_path=mock.ANY)
-
-
-def test_create_artifact_file_response_uses_local_path_mimetype_and_artifact_name(tmp_path):
-    test_file = tmp_path / "payload.html"
-    test_file.write_text("<html><body>ok</body></html>")
-
-    with app.test_request_context(method="GET"):
-        response = _create_artifact_file_response(str(test_file), "artifacts/model.txt")
-
-    assert response.mimetype == "text/html"
-    assert response.headers["Content-Disposition"] == "attachment; filename=model.txt"
-
-
-def test_create_artifact_file_response_quotes_token_unsafe_ascii_artifact_name(tmp_path):
-    test_file = tmp_path / "payload.html"
-    test_file.write_text("<html><body>ok</body></html>")
-
-    with app.test_request_context(method="GET"):
-        response = _create_artifact_file_response(str(test_file), "artifacts/my model;a.txt")
-
-    assert response.headers["Content-Disposition"] == 'attachment; filename="my model;a.txt"'
-
-
-def test_download_artifact_uses_local_path_fast_path(enable_serve_artifacts, tmp_path):
-    artifact_path = "test_model/model.pkl"
-    test_data = b"local artifact"
-    test_file = tmp_path / "model.pkl"
-    test_file.write_bytes(test_data)
-
-    with (
-        app.test_request_context(method="GET"),
-        mock.patch("mlflow.server.handlers._get_artifact_repo_mlflow_artifacts") as mock_repo,
-        mock.patch("mlflow.server.handlers.tempfile.TemporaryDirectory") as mock_tmp_dir,
-    ):
-        mock_tmp_dir_instance = mock.MagicMock()
-        mock_tmp_dir.return_value = mock_tmp_dir_instance
-
-        mock_artifact_repo = mock.MagicMock()
-        mock_artifact_repo.get_local_path.return_value = str(test_file)
-        mock_repo.return_value = mock_artifact_repo
-
-        response = _download_artifact(artifact_path)
-
-    response.direct_passthrough = False
-    assert response.get_data() == test_data
-    assert response.headers["Content-Disposition"] == "attachment; filename=model.pkl"
-    mock_artifact_repo.get_local_path.assert_called_once_with(artifact_path)
-    mock_artifact_repo.download_artifacts.assert_not_called()
-    mock_tmp_dir.assert_not_called()
-
-
 def test_download_artifact_streams_in_chunks(enable_serve_artifacts, tmp_path):
     # Create a test file with binary data larger than the chunk size (2MB + 1000 bytes)
     test_file_size = ARTIFACT_STREAM_CHUNK_SIZE * 2 + 1000
@@ -3852,7 +4017,6 @@ def test_download_artifact_streams_in_chunks(enable_serve_artifacts, tmp_path):
         mock_tmp_dir.return_value = mock_tmp_dir_instance
 
         mock_artifact_repo = mock.MagicMock()
-        mock_artifact_repo.get_local_path.return_value = None
         mock_artifact_repo.download_artifacts.return_value = str(test_file)
         mock_repo.return_value = mock_artifact_repo
 
@@ -3875,33 +4039,6 @@ def test_download_artifact_streams_in_chunks(enable_serve_artifacts, tmp_path):
         # Verify that all data is correctly streamed
         streamed_data = b"".join(response_chunks)
         assert streamed_data == test_data
-        mock_artifact_repo.get_local_path.assert_called_once_with(artifact_path)
-        mock_artifact_repo.download_artifacts.assert_called_once_with(artifact_path, str(tmp_path))
-
-
-def test_download_artifact_cleans_up_tmp_dir_when_download_fails(enable_serve_artifacts, tmp_path):
-    artifact_path = "test_model/model.pkl"
-
-    with (
-        app.test_request_context(method="GET"),
-        mock.patch("mlflow.server.handlers._get_artifact_repo_mlflow_artifacts") as mock_repo,
-        mock.patch("mlflow.server.handlers.tempfile.TemporaryDirectory") as mock_tmp_dir,
-    ):
-        mock_tmp_dir_instance = mock.MagicMock()
-        mock_tmp_dir_instance.name = str(tmp_path)
-        mock_tmp_dir.return_value = mock_tmp_dir_instance
-
-        mock_artifact_repo = mock.MagicMock()
-        mock_artifact_repo.get_local_path.return_value = None
-        mock_artifact_repo.download_artifacts.side_effect = RuntimeError("boom")
-        mock_repo.return_value = mock_artifact_repo
-
-        with pytest.raises(RuntimeError, match="boom"):
-            _download_artifact(artifact_path)
-
-    mock_artifact_repo.get_local_path.assert_called_once_with(artifact_path)
-    mock_artifact_repo.download_artifacts.assert_called_once_with(artifact_path, str(tmp_path))
-    mock_tmp_dir_instance.cleanup.assert_called_once()
 
 
 @pytest.mark.parametrize(
@@ -3934,20 +4071,11 @@ def test_response_with_file_attachment_headers_encodes_non_ascii_filename(
     assert header == f"attachment; filename={expected_simple}; filename*=UTF-8''{expected_quoted}"
 
 
-@pytest.mark.parametrize(
-    ("filename", "expected_header"),
-    [
-        ("model.pkl", "attachment; filename=model.pkl"),
-        ("my model;a.txt", 'attachment; filename="my model;a.txt"'),
-    ],
-)
-def test_response_with_file_attachment_headers_ascii_filename_preserves_werkzeug_quoting(
-    filename, expected_header
-):
+def test_response_with_file_attachment_headers_ascii_filename_unchanged():
     with app.test_request_context():
-        response = _response_with_file_attachment_headers(filename, Response())
+        response = _response_with_file_attachment_headers("model.pkl", Response())
 
-    assert response.headers["Content-Disposition"] == expected_header
+    assert response.headers["Content-Disposition"] == "attachment; filename=model.pkl"
 
 
 @pytest.mark.parametrize(

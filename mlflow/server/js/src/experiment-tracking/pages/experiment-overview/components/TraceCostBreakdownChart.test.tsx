@@ -91,7 +91,7 @@ describe('TraceCostBreakdownChart', () => {
       renderComponent();
 
       // Check that actual chart content is not rendered during loading
-      expect(screen.queryByText('Cost breakdown')).not.toBeInTheDocument();
+      expect(screen.queryByText('Cost Breakdown')).not.toBeInTheDocument();
     });
   });
 
@@ -146,7 +146,7 @@ describe('TraceCostBreakdownChart', () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText('Cost breakdown')).toBeInTheDocument();
+        expect(screen.getByText('Cost Breakdown')).toBeInTheDocument();
       });
     });
 
@@ -156,7 +156,7 @@ describe('TraceCostBreakdownChart', () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText('Total cost')).toBeInTheDocument();
+        expect(screen.getByText('Total Cost')).toBeInTheDocument();
       });
     });
 

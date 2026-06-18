@@ -69,7 +69,7 @@ export const ToolLatencyChart: React.FC = () => {
           icon={<LightningIcon />}
           title={
             <FormattedMessage
-              defaultMessage="Latency comparison"
+              defaultMessage="Latency Comparison"
               description="Title for the tool latency comparison chart"
             />
           }
@@ -102,6 +102,7 @@ export const ToolLatencyChart: React.FC = () => {
                   />
                 }
                 cursor={{ stroke: theme.colors.actionTertiaryBackgroundHover }}
+                wrapperStyle={{ pointerEvents: 'auto' }}
               />
               {displayedItems.map((toolName) => {
                 const originalIndex = toolNames.indexOf(toolName);

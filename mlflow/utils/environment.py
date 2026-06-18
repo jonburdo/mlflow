@@ -22,6 +22,7 @@ from mlflow.environment_variables import (
     MLFLOW_INPUT_EXAMPLE_INFERENCE_TIMEOUT,
     MLFLOW_LOCK_MODEL_DEPENDENCIES,
     MLFLOW_REQUIREMENTS_INFERENCE_RAISE_ERRORS,
+    MLFLOW_SKIP_PIP_REQUIREMENTS_CHECK,
     MLFLOW_UV_AUTO_DETECT,
 )
 from mlflow.exceptions import MlflowException
@@ -926,12 +927,17 @@ def _validate_version_constraints(requirements):
     them using pip's `--dry-run` install option. If any version conflicts are detected, it
     raises an MlflowException with details of the conflict.
 
+    Validation is skipped entirely when the ``MLFLOW_SKIP_PIP_REQUIREMENTS_CHECK`` environment
+    variable is set to ``True``, which is useful in air-gapped environments where pip cannot
+    reach external package indexes.
+
     Args:
         requirements (list of str): A list of package requirements (e.g., `["pandas>=1.15",
         "pandas<2"]`).
 
     Raises:
         MlflowException: If any version conflicts are detected among the provided requirements.
+            Not raised when ``MLFLOW_SKIP_PIP_REQUIREMENTS_CHECK`` is ``True``.
 
     Returns:
         None: This function does not return anything. It either completes successfully or raises
@@ -941,6 +947,9 @@ def _validate_version_constraints(requirements):
         _validate_version_constraints(["tensorflow<2.0", "tensorflow>2.3"])
         # This will raise an exception due to boundary validity.
     """
+    if MLFLOW_SKIP_PIP_REQUIREMENTS_CHECK.get():
+        return
+
     with tempfile.NamedTemporaryFile(mode="w+", delete=False) as tmp_file:
         tmp_file.write("\n".join(requirements))
         tmp_file_name = tmp_file.name
