@@ -117,7 +117,6 @@ class UpdateMCPServerRequest(BaseModel):
     display_name: str | None = None
     description: str | None = None
     icons: list[MCPIconPayload] | None = None
-    latest_version: str | None = None
 
 
 class CreateMCPServerVersionRequest(BaseModel):
@@ -376,7 +375,7 @@ def _icon_payloads_to_entities(
 def _update_mcp_server_kwargs(name: str, request: UpdateMCPServerRequest) -> dict[str, Any]:
     kwargs: dict[str, Any] = {"name": name}
     provided_fields = request.model_fields_set
-    for field_name in ("description", "display_name", "icons", "latest_version"):
+    for field_name in ("description", "display_name", "icons"):
         if field_name in provided_fields:
             kwargs[field_name] = (
                 _icon_payloads_to_entities(request.icons)
