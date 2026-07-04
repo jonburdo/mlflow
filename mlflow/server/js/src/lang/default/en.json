@@ -4179,6 +4179,10 @@
     "defaultMessage": "Last modified",
     "description": "Column title for last modified timestamp for a model in the registered model page"
   },
+  "Gv0D2y": {
+    "defaultMessage": "Not specified",
+    "description": "Fallback text shown in the Associated Model column when a prompt has no model configuration"
+  },
   "Gxl8pl": {
     "defaultMessage": "Version",
     "description": "Label for the version picker on the playground prompt-registry modal"
@@ -6703,6 +6707,10 @@
     "defaultMessage": "Span: {spanName}",
     "description": "Label for the span name in assessment metadata"
   },
+  "S3cZt1": {
+    "defaultMessage": "Associated model",
+    "description": "Label for the associated model filter on the registered prompts page"
+  },
   "S50iFK": {
     "defaultMessage": "Create endpoint",
     "description": "Title for create endpoint modal"
@@ -8351,6 +8359,10 @@
     "defaultMessage": "Operator",
     "description": "Usage overview > filter row > operator dropdown aria label"
   },
+  "ZDxEC/": {
+    "defaultMessage": "All models",
+    "description": "Placeholder for the associated model filter when no model is selected"
+  },
   "ZGhYvh": {
     "defaultMessage": "No traces in this queue yet",
     "description": "Review queue: empty queue title"
@@ -9322,6 +9334,10 @@
   "dHAuWp": {
     "defaultMessage": "You need to provide a prompt template",
     "description": "Experiment page > new run modal > invalid state - no prompt template provided"
+  },
+  "dJPVU+": {
+    "defaultMessage": "Associated Model",
+    "description": "Header for the associated model column in the registered prompts table"
   },
   "dJaboT": {
     "defaultMessage": "Fetching traces failed",

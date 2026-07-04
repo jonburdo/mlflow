@@ -25,13 +25,20 @@ const PromptsPage = ({ experimentId }: { experimentId?: string } = {}) => {
   const workspaceFromUrl = extractWorkspaceFromSearchParams(searchParams);
 
   const [searchFilter, setSearchFilter] = useState('');
+  const [modelFilter, setModelFilter] = useState<string | undefined>(undefined);
   const navigate = useNavigate();
   const componentId = experimentId ? 'mlflow.prompts.experiment.list' : 'mlflow.prompts.global.list';
 
   const [debouncedSearchFilter] = useDebounce(searchFilter, 500);
 
   const { data, error, refetch, hasNextPage, hasPreviousPage, isLoading, onNextPage, onPreviousPage } =
-    usePromptsListQuery({ experimentId, searchFilter: debouncedSearchFilter });
+    usePromptsListQuery({ experimentId, searchFilter: debouncedSearchFilter, modelFilter });
+
+  const { data: unfilteredPrompts } = usePromptsListQuery({
+    experimentId,
+    searchFilter: debouncedSearchFilter,
+    fetchAllPages: true,
+  });
 
   const { EditTagsModal, showEditPromptTagsModal } = useUpdateRegisteredPromptTags({ onSuccess: refetch });
   const { CreatePromptModal, openModal: openCreateVersionModal } = useCreatePromptModal({
@@ -92,6 +99,9 @@ const PromptsPage = ({ experimentId }: { experimentId?: string } = {}) => {
             <PromptsListFilters
               searchFilter={searchFilter}
               onSearchFilterChange={setSearchFilter}
+              modelFilter={modelFilter}
+              setModelFilter={setModelFilter}
+              prompts={unfilteredPrompts ?? []}
               componentId={`${componentId}.search`}
               actions={
                 isEmbedded && !experimentId && createButton ? (
@@ -114,7 +124,7 @@ const PromptsPage = ({ experimentId }: { experimentId?: string } = {}) => {
           hasNextPage={hasNextPage}
           hasPreviousPage={hasPreviousPage}
           isLoading={isLoading}
-          isFiltered={Boolean(searchFilter)}
+          isFiltered={Boolean(searchFilter || modelFilter)}
           onNextPage={onNextPage}
           onPreviousPage={onPreviousPage}
           onEditTags={showEditPromptTagsModal}

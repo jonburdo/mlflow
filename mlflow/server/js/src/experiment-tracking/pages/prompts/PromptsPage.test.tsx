@@ -1,5 +1,5 @@
 import { jest, describe, it, expect } from '@jest/globals';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import PromptsPage from './PromptsPage';
 import { QueryClientProvider, QueryClient } from '@mlflow/mlflow/src/common/utils/reactQueryHooks';
 import { setupServer } from '../../../common/utils/setup-msw';
@@ -83,7 +83,7 @@ describe('PromptsPage', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    await userEvent.type(screen.getByRole('combobox'), 'new_tag');
+    await userEvent.type(within(screen.getByRole('dialog')).getByRole('combobox'), 'new_tag');
     await userEvent.click(screen.getByText('Add tag "new_tag"'));
 
     await userEvent.type(screen.getByPlaceholderText('Type a value'), 'new_value');
