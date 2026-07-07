@@ -97,7 +97,7 @@ export const jsonBigIntResponseParser = ({ resolve, response }: any) =>
   });
 
 export const yamlResponseParser = ({ resolve, response }: any) =>
-  parseResponse({ resolve, response, parser: yaml.safeLoad });
+  parseResponse({ resolve, response, parser: yaml.load });
 
 export const defaultError = ({ reject, response, err }: any) => {
   // eslint-disable-next-line no-console -- TODO(FEINF-3587)
