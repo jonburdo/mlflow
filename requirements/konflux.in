@@ -3,5 +3,8 @@
 boto3
 psycopg2
 kubernetes>=29.0.0
+# Security constraints for shipped image CVEs.
+pillow>=12.3.0
+gitpython>=3.1.47
 # Starlette 1.0.1+ fixes CVE-2026-48710 in the shipped runtime image.
 starlette>=1.0.1,<2
