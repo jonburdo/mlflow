@@ -502,6 +502,8 @@ extend-exclude = [
   "mlflow/utils/gorilla.py",
   # Submodule (typos should be fixed upstream)
   "mlflow/assistant/skills/**/*",
+  # ODH fork history (contains upstream commit hashes and names)
+  "FORK_HISTORY.md",
 ]
 
 [tool.typos.default]

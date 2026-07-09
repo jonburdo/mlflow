@@ -1223,6 +1223,7 @@ module.exports = {
   "mlflow.experiment-page.header.back-icon-button": "",
   "mlflow.experiment-page.header.docs-link": "",
   "mlflow.experiment-page.header.docs-link-button": "",
+  "mlflow.experiment-page.side-nav": "",
 
   // -- mlflow.experiment-review-queue --
   "mlflow.experiment-review-queue.delete-queue-confirm": "",
@@ -1264,7 +1265,6 @@ module.exports = {
   "mlflow.experiment-scorers.new-scorer-button": "",
   "mlflow.experiment-scorers.output-type-select": "",
   "mlflow.experiment-scorers.scorer-status-tag": "",
-  "mlflow.experiment-scorers.switch-to-endpoint-link": "",
   "mlflow.experiment-scorers.switch-to-manual-link": "",
   "mlflow.experiment-scorers.traces-view-create-judge": "",
   "mlflow.experiment-scorers.traces-view-judge-error": "",
@@ -1713,6 +1713,7 @@ module.exports = {
   "mlflow.home.create_workspace_modal.workspace_name_input": "",
   "mlflow.home.create_workspace_modal.workspace_settings": "",
   "mlflow.home.demo-banner.launch": "",
+  "mlflow.home.experiments-section": "",
   "mlflow.home.experiments.create": "",
   "mlflow.home.experiments.error": "",
   "mlflow.home.experiments.retry": "",
