@@ -27,10 +27,9 @@ import { getRouteDefs as getCommonRouteDefs } from './common/route-defs';
 import { getGatewayRouteDefs } from './gateway/route-defs';
 import { getAccountRouteDefs } from './account/route-defs';
 import { getAdminRouteDefs } from './admin/route-defs';
-import { getMCPRegistryRouteDefs } from './mcp-registry/route-defs';
 import { DEV_USER_SWITCHER_ENABLED } from './admin/DevUserSwitcher';
+import { shouldEnableAIGateway } from './common/utils/FeatureUtils';
 import { useInitializeExperimentRunColors } from './experiment-tracking/components/experiment-page/hooks/useExperimentRunColor';
-import { IssueDetectionJobNotifications } from './experiment-tracking/components/experiment-page/components/traces-v3/IssueDetectionJobNotifications';
 import { MlflowSidebar } from './common/components/MlflowSidebar';
 import { AssistantProvider, AssistantRouteContextProvider } from './assistant';
 import { RootAssistantLayout } from './common/components/RootAssistantLayout';
@@ -85,7 +84,6 @@ const MlflowRootLayout = ({
       <div css={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <ErrorModal />
         <AppErrorBoundary>
-          <IssueDetectionJobNotifications />
           <RootAssistantLayout>
             <div
               css={{
@@ -236,8 +234,7 @@ export const MlflowRouter = () => {
     () => [
       ...getExperimentTrackingRouteDefs(),
       ...getModelRegistryRouteDefs(),
-      ...getGatewayRouteDefs(),
-      ...getMCPRegistryRouteDefs(),
+      ...(shouldEnableAIGateway() ? getGatewayRouteDefs() : []),
       ...getAccountRouteDefs(),
       ...getAdminRouteDefs(),
       ...getCommonRouteDefs(),

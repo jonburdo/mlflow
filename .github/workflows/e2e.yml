@@ -13,6 +13,8 @@ on:
         default: "odh-stable"
         type: string
 
+permissions: {}
+
 concurrency:
   group: e2e-${{ github.event.workflow_run.head_repository.full_name || github.repository }}-${{ github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: true

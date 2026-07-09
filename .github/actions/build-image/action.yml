@@ -51,14 +51,18 @@ runs:
       shell: bash
       if: inputs.OVERWRITE == 'false'
       env:
-        IMAGE: quay.io/${{ inputs.QUAY_ORG }}/${{ inputs.IMAGE_REPO }}:${{ env.TARGET_IMAGE_TAG }}
+        QUAY_ORG: ${{ inputs.QUAY_ORG }}
+        IMAGE_REPO: ${{ inputs.IMAGE_REPO }}
+        TARGET_IMAGE_TAG: ${{ env.TARGET_IMAGE_TAG }}
       run: |
         set -euo pipefail
 
+        IMAGE="quay.io/${QUAY_ORG}/${IMAGE_REPO}:${TARGET_IMAGE_TAG}"
+
         if ! tags=$(curl --fail --silent --show-error \
           --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5 \
-          "https://quay.io/api/v1/repository/${{ inputs.QUAY_ORG }}/${{ inputs.IMAGE_REPO }}/tag/?specificTag=${{ env.TARGET_IMAGE_TAG }}"); then
-            echo "::error::Failed to query Quay API for tag ${{ env.TARGET_IMAGE_TAG }}"
+          "https://quay.io/api/v1/repository/${QUAY_ORG}/${IMAGE_REPO}/tag/?specificTag=${TARGET_IMAGE_TAG}"); then
+            echo "::error::Failed to query Quay API for tag ${TARGET_IMAGE_TAG}"
             exit 1
         fi
 
@@ -66,7 +70,7 @@ runs:
         notempty=$(echo "${tags}" | yq '.tags | any')
 
         if [[ "${notempty}" == "true" && "${latest_tag_has_end_ts}" == "null" ]]; then
-            echo "::error::The image ${{ env.IMAGE }} already exists"
+            echo "::error::The image ${IMAGE} already exists"
             exit 1
         else
             echo "Image does not exist...proceeding with build & push."

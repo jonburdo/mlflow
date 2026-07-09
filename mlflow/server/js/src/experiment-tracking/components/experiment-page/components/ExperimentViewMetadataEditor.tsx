@@ -450,6 +450,7 @@ export const ExperimentViewMetadataEditor = ({
       )}
       <Modal
         componentId="mlflow.experiment.metadata_editor.modal"
+        data-testid="edit-experiment-modal"
         title={
           <FormattedMessage
             defaultMessage="Edit experiment"
@@ -457,7 +458,7 @@ export const ExperimentViewMetadataEditor = ({
           />
         }
         visible={editing}
-        okButtonProps={{ loading: isSaving }}
+        okButtonProps={{ loading: isSaving, 'data-testid': 'edit-experiment-save-button' }}
         okText={
           <FormattedMessage defaultMessage="Save" description="experiment page > edit experiment modal > save button" />
         }
@@ -499,6 +500,7 @@ export const ExperimentViewMetadataEditor = ({
               </FormUI.Label>
               <Input
                 componentId="mlflow.experiment.edit.name"
+                data-testid="edit-experiment-name-input"
                 id="mlflow.experiment.edit.name"
                 value={tmpName}
                 onChange={(e) => {
