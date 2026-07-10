@@ -250,7 +250,6 @@ export function MlflowSidebar({
             },
           ]
         : []),
-      ...(shouldShowGenAIFeatures(enableWorkflowBasedNavigation, workflowType) && shouldEnableAIGateway()
       ...(shouldShowGenAIFeatures(enableWorkflowBasedNavigation, workflowType) && !showNestedExperimentItems
         ? [
             {
@@ -267,6 +266,7 @@ export function MlflowSidebar({
             },
           ]
         : []),
+      ...(shouldShowGenAIFeatures(enableWorkflowBasedNavigation, workflowType) && shouldEnableAIGateway()
         ? [
             {
               key: 'gateway',
