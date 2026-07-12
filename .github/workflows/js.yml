@@ -30,6 +30,8 @@ defaults:
   run:
     shell: bash
 
+permissions: {}
+
 jobs:
   check-component-ids:
     if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false || github.event.pull_request.user.login == 'Copilot' && github.event.pull_request.user.type == 'Bot')
@@ -65,9 +67,6 @@ jobs:
       - name: Install dependencies
         run: |
           yarn install --immutable
-      - name: Audit CSS override selectors
-        run: |
-          yarn audit:css-overrides
       - name: Run lint
         run: |
           yarn lint
@@ -104,9 +103,5 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
       - name: Run build
-        env:
-          # Prevent warnings (emitted from react-pdf) from being treated as errors
-          # https://github.com/wojtekmaj/react-pdf/issues/280
-          CI: false
         run: |
           yarn build

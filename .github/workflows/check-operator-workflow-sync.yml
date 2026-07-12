@@ -5,6 +5,8 @@ on:
     paths:
       - .github/workflows/operator-integration-tests.yml
 
+permissions: {}
+
 defaults:
   run:
     shell: bash

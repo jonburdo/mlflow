@@ -19,6 +19,7 @@ from mlflow.server.auth.routes import (
     GET_METRIC_HISTORY_BULK_INTERVAL,
     GET_MODEL_VERSION_ARTIFACT,
     GET_TRACE_ARTIFACT,
+    GET_TRACE_ARTIFACT_V3,
     SEARCH_DATASETS,
     UPLOAD_ARTIFACT,
 )
@@ -1721,9 +1722,10 @@ def test_create_promptlab_run_validator_uses_workspace_permissions(workspace_per
         assert auth_module.validate_can_create_promptlab_run()
 
 
-def test_trace_artifact_validator_uses_workspace_permissions(workspace_permission_setup):
+@pytest.mark.parametrize("path", [GET_TRACE_ARTIFACT, GET_TRACE_ARTIFACT_V3])
+def test_trace_artifact_validator_uses_workspace_permissions(workspace_permission_setup, path):
     with auth_module.app.test_request_context(
-        GET_TRACE_ARTIFACT,
+        path,
         method="GET",
         query_string={"request_id": "trace-1"},
     ):
@@ -1851,15 +1853,16 @@ def test_create_promptlab_run_validator_denied_without_workspace_permission(
         assert not auth_module.validate_can_create_promptlab_run()
 
 
+@pytest.mark.parametrize("path", [GET_TRACE_ARTIFACT, GET_TRACE_ARTIFACT_V3])
 def test_trace_artifact_validator_denied_without_workspace_permission(
-    workspace_permission_setup,
+    workspace_permission_setup, path
 ):
     store = workspace_permission_setup["store"]
     username = workspace_permission_setup["username"]
     _set_workspace_permission(store, username, NO_PERMISSIONS.name)
 
     with auth_module.app.test_request_context(
-        GET_TRACE_ARTIFACT,
+        path,
         method="GET",
         query_string={"request_id": "trace-1"},
     ):
@@ -2686,22 +2689,42 @@ def test_validate_can_list_roles_multi_workspace(role_auth_setup, actor, workspa
         assert auth_module.validate_can_list_roles() is expected
 
 
-# Super admin is omitted from these parametrizations: ``_before_request``
-# short-circuits via ``sender_is_admin`` before the validator is reached, so
-# the validator is unreachable for them in production.
+# Listing users is scoped to workspace membership (the review-queue assignment UI
+# needs the roster; assigning still requires experiment MANAGE), so the roster
+# isn't leaked across workspaces. Super admin is omitted: ``_before_request``
+# short-circuits via ``sender_is_admin`` before the validator is reached.
 @pytest.mark.parametrize(
-    ("actor", "expected"),
+    ("actor", "workspace", "expected"),
     [
-        ("ws_admin_foo", True),
-        ("ws_admin_bar", True),
-        ("ws_member_foo", False),
-        ("outsider", False),
+        # Workspace-wide grant carrying can_use (USE/MANAGE) → may list the roster.
+        ("ws_admin_foo", "foo", True),
+        # Isolation: an admin of another workspace can't list users in this one.
+        ("ws_admin_foo", "bar", False),
+        ("ws_admin_bar", "foo", False),
+        # A plain experiment-level grant is not a workspace-wide grant → denied.
+        ("ws_member_foo", "foo", False),
+        # No grant anywhere.
+        ("outsider", "foo", False),
     ],
 )
-def test_validate_can_list_users(role_auth_setup, actor, expected):
+def test_validate_can_list_users_workspace_scoped(role_auth_setup, actor, workspace, expected):
     role_auth_setup["login_as"](actor)
+    token = workspace_context.set_server_request_workspace(workspace)
+    try:
+        with auth_module.app.test_request_context("/api/2.0/mlflow/users/list", method="GET"):
+            assert auth_module.validate_can_list_users() is expected
+    finally:
+        workspace_context._WORKSPACE.reset(token)
+
+
+def test_validate_can_list_users_allows_any_user_without_workspaces(role_auth_setup, monkeypatch):
+    # With workspaces disabled there is no isolation boundary, so any authenticated
+    # user may list the roster (single-tenant). ``role_auth_setup`` enables
+    # workspaces; override it back off for this case.
+    monkeypatch.setenv(MLFLOW_ENABLE_WORKSPACES.name, "false")
+    role_auth_setup["login_as"]("outsider")
     with auth_module.app.test_request_context("/api/2.0/mlflow/users/list", method="GET"):
-        assert auth_module.validate_can_list_users() is expected
+        assert auth_module.validate_can_list_users() is True
 
 
 def test_list_users_handler_eager_loads_scoped_roles(role_auth_setup):

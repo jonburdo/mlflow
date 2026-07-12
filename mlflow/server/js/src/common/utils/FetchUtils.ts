@@ -87,7 +87,7 @@ export const defaultResponseParser = ({ resolve, response }: any) =>
   parseResponse({ resolve, response, parser: JSON.parse });
 
 export const yamlResponseParser = ({ resolve, response }: any) =>
-  parseResponse({ resolve, response, parser: yaml.load });
+  parseResponse({ resolve, response, parser: yaml.safeLoad });
 
 export const defaultError = ({ reject, response, err }: any) => {
   // error is propagated via reject below

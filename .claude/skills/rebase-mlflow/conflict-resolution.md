@@ -11,6 +11,23 @@
 5. **For lock files** — take ODH's `exclude-newer-span`, accept upstream deps
 6. **When in doubt** — check `git show upstream/master:<file>` for the intended final state
 
+## Conflict type reference
+
+Different git conflict types require different handling. Read `git status` carefully before resolving.
+
+**`CONFLICT (modify/delete)`** — ODH deleted a file, upstream modified it.
+
+- For upstream CI workflows (`.github/workflows/`): `git rm` — ODH intentionally removes these.
+- For any other file type: investigate before deleting. The file may still be needed.
+
+**`CONFLICT (rename/delete)`** — ODH deleted the old path, upstream renamed the file to a new path.
+
+- Do NOT `git rm` the renamed file. Upstream reorganized the code; the renamed file is still needed.
+- Keep the renamed version. Only the old path should be gone.
+- Common for dev tooling files that upstream reorganizes between releases.
+
+**Content conflicts in test files** — After resolving, verify ALL references to changed values are consistent within the file. Squashing can merge changes from multiple commits unevenly — some test functions get updated while others in the same file keep the old values.
+
 ## File-by-file patterns
 
 **Scaffolding commit:**

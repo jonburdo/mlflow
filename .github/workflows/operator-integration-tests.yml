@@ -19,6 +19,8 @@ on:
 
   workflow_dispatch:
 
+permissions: {}
+
 defaults:
   run:
     shell: bash
@@ -135,6 +137,20 @@ jobs:
           ref: ${{ needs.resolve-operator-ref.outputs.operator_branch }}
           persist-credentials: false
 
+      - name: Checkout MLflow pyproject.toml
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          sparse-checkout: pyproject.toml
+          path: mlflow-source
+          persist-credentials: false
+
+      - name: Resolve MLflow version for operator override
+        id: mlflow-version
+        run: |
+          mlflow_version=$(grep '^version' mlflow-source/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "Resolved MLflow version: ${mlflow_version}"
+          echo "version=${mlflow_version}" >> "$GITHUB_OUTPUT"
+
       - name: Resolve operator Dockerfile
         id: dockerfile
         run: |
@@ -147,9 +163,12 @@ jobs:
       - name: Build MLflow operator image archive
         env:
           DOCKERFILE: ${{ steps.dockerfile.outputs.path }}
+          MLFLOW_VERSION_OVERRIDE: ${{ steps.mlflow-version.outputs.version }}
         run: |
           mkdir -p operator-image
-          docker build -f "$DOCKERFILE" -t "$OPERATOR_RUNTIME_IMAGE" .
+          docker build \
+            --build-arg SUPPORTED_MLFLOW_VERSION_OVERRIDE="$MLFLOW_VERSION_OVERRIDE" \
+            -f "$DOCKERFILE" -t "$OPERATOR_RUNTIME_IMAGE" .
           docker save -o "operator-image/${OPERATOR_RUNTIME_ARTIFACT}.tar" "$OPERATOR_RUNTIME_IMAGE"
 
       - name: Upload MLflow operator image artifact

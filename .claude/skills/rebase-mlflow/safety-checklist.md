@@ -11,6 +11,12 @@ If `$SQUASH_BASE` is not set, reload it: `source /tmp/rebase-vars.env`
 - [ ] No stray conflict markers (`grep -c '<<<<<<<'`)
 - [ ] TypeScript compiles with zero errors
 - [ ] Key ODH features verified (env vars, gateway decorator, workspace utils, PatternFly overrides)
+- [ ] Step 10b verified: no missing downstream files, no missing ODH entries in shared files
+- [ ] Step 10b verified: no upstream files incorrectly deleted via rename/delete conflicts
+- [ ] Step 10b verified: ODH test modifications consistent within each file
+- [ ] Step 10b verified: ODH-only tests still valid after upstream refactoring
+- [ ] Step 10b verified: ODH mocks cover all exports used by newly-rendered upstream components
+- [ ] ODH-specific `package.json` entries present (PatternFly, module federation, audit scripts, Playwright)
 - [ ] Late-merging PRs cherry-picked — no PRs merged to master after `$SQUASH_BASE` whose content is missing
 
 **CSS override audit:**

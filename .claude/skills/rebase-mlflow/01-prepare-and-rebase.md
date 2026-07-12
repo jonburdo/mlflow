@@ -145,9 +145,10 @@ Squash `keep:` commits into 3 categories, in this order:
 
    **If the rebase fails catastrophically** (not just conflicts): run `git rebase --abort` and re-examine the squash commits from Phase 2.
 
-9. **Resolve conflicts.** Git will stop at each conflicted commit. Read `.claude/skills/rebase-mlflow/conflict-resolution.md` for file-by-file patterns. The general rules:
+9. **Resolve conflicts.** Git will stop at each conflicted commit. Read `.claude/skills/rebase-mlflow/conflict-resolution.md` for the full conflict type reference and file-by-file patterns. The general rules:
 
    - **Modify/delete (workflows):** ODH intentionally deletes upstream CI files → `git rm`
+   - **Rename/delete:** Upstream renamed a file that ODH deleted by old name → **keep the renamed version**, do NOT `git rm`
    - **Both sides added code:** Keep both (upstream's + ODH's)
    - **Upstream renamed something:** Accept the rename, keep ODH additions
 
@@ -184,6 +185,53 @@ Squash `keep:` commits into 3 categories, in this order:
 
     Review each new workflow — if it's Databricks-specific, upstream-only CI, or not applicable to the fork, `git rm` it and amend the scaffolding commit.
 
+10b. **Verify the rebased branch is complete.** Run these checks to catch files or content lost during the rebase.
+
+    **Step 1 — Missing downstream files.** Compare the branch against master to find files that were lost when git dropped an "empty" squash commit:
+
+    ```bash
+    comm -23 \
+      <(git ls-tree -r --name-only $ODH_REMOTE/master | sort) \
+      <(git ls-tree -r --name-only HEAD | sort)
+    ```
+
+    For each listed file, determine whether it is an ODH file that should exist (recover from `$ODH_REMOTE/master`) or an upstream file removed in `$UPSTREAM_TAG` (expected, no action).
+
+    ```bash
+    mkdir -p "$(dirname "$file")"
+    git show $ODH_REMOTE/master:"$file" > "$file"
+    git add "$file"
+    ```
+
+    **Step 2 — Missing ODH entries in shared files.** Files that exist on both sides are not caught above. Verify these retain ODH-specific content:
+
+    ```bash
+    grep mlflow-kubernetes-plugins requirements/konflux-pypi.in
+    grep -c "patternfly\|module-federation\|audit:css\|playwright" mlflow/server/js/package.json
+    ```
+
+    If entries are missing, restore from `$ODH_REMOTE/master` and merge in new upstream additions from `$UPSTREAM_TAG`.
+
+    **Step 3 — Consistent test modifications.** Squashing can apply changes unevenly across test functions in the same file. For each ODH-modified test file, verify that repeated patterns (label text, mock stubs) use the same values throughout:
+
+    ```bash
+    git diff $UPSTREAM_TAG..HEAD -- '*.test.tsx' '*.test.ts' --name-only
+    ```
+
+    **Step 4 — ODH tests broken by upstream refactoring.** If upstream reorganized modules, ODH-only test files that import the old API will break. Find ODH-only tests and verify their imports still resolve:
+
+    ```bash
+    comm -23 \
+      <(git ls-tree -r --name-only HEAD -- 'dev/tests/' 'tests/' | sort) \
+      <(git ls-tree -r --name-only $UPSTREAM_TAG -- 'dev/tests/' 'tests/' | sort)
+    ```
+
+    Remove or update tests that reference refactored or removed upstream code.
+
+    **Step 5 — Incomplete ODH mocks.** Upstream may add new components to existing render trees. If an ODH mock stubs some exports but the target version added new ones used by newly-rendered components, the mock needs updating. This is caught by running JS tests in step 17.
+
+    Amend all recovered files and fixes into the appropriate squash commit.
+
 **Next:** The rebase is done but CI will fail on several known issues. Move to Phase 4 to fix them before pushing.
 
 ---
@@ -219,13 +267,20 @@ Squash `keep:` commits into 3 categories, in this order:
     uv run pre-commit run prettier --files FORK_HISTORY.md .claude/skills/rebase-mlflow/skill.md
     ```
 
-17. **Upstream tests broken by ODH simplifications** — Run the JS tests to catch breakage:
+17. **JS tests** — Run the full JS test suite:
 
     ```bash
     (cd mlflow/server/js && yarn test --watchAll=false 2>&1 | tail -20)
     ```
 
-    If tests fail: check whether the failure is from an ODH simplification (update test expectations) or a genuine upstream bug (cherry-pick a fix in step 20). If unclear, investigate before changing tests.
+    For each failing test, determine the root cause before fixing:
+
+    - **Inconsistent test expectations from squashing** — Check that ALL references to changed values (label text, mock data, component props) are consistent within the file. Squashing can update some test functions but miss others.
+    - **Incomplete ODH mocks** — Upstream may add new hooks or components to existing render trees. If a mock stubs one export but newly-rendered components call another export from the same module, add the missing exports to the mock. Look for `TypeError: ... is not a function` during `render()`.
+    - **ODH-only tests referencing refactored upstream modules** — If upstream reorganized dev tooling or internal APIs, downstream tests that import the old API will break. Update or remove them.
+    - **Genuine upstream bug** — Check whether the same test also fails on `$ODH_REMOTE/master`. If it does, it is pre-existing. If it passes on master but fails here, it is a rebase issue.
+
+    Do not dismiss failures without checking whether they also occur on master.
 
 18. **Commit CI fixes** by amending them into the relevant squash commit (scaffolding, backend, or UI) rather than creating a separate commit:
 
