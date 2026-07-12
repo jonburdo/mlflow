@@ -28,6 +28,8 @@ on:
       - requirements/**
       - mlflow/server/js/yarn.lock
 
+permissions: {}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true

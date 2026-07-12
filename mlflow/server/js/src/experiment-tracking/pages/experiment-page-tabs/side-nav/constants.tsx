@@ -8,13 +8,18 @@ import {
   GavelIcon,
   ListIcon,
   ModelsIcon,
+  PlayIcon,
   PlusMinusSquareIcon,
   SpeechBubbleIcon,
   TextBoxIcon,
   UserGroupIcon,
 } from '@databricks/design-system';
 import { FormattedMessage } from 'react-intl';
-import { enableScorersUI, shouldEnableExperimentOverviewTab } from '@mlflow/mlflow/src/common/utils/FeatureUtils';
+import {
+  enableScorersUI,
+  shouldEnableAIGateway,
+  shouldEnableExperimentOverviewTab,
+} from '@mlflow/mlflow/src/common/utils/FeatureUtils';
 
 export const FULL_WIDTH_CLASS_NAME = 'mlflow-experiment-page-side-nav-full';
 export const COLLAPSED_CLASS_NAME = 'mlflow-experiment-page-side-nav-collapsed';
@@ -61,6 +66,17 @@ const ExperimentPageSideNavGenAIConfig = {
     {
       label: (
         <FormattedMessage
+          defaultMessage="Review"
+          description="Label for the review tab in the MLflow experiment navbar"
+        />
+      ),
+      icon: <UserGroupIcon />,
+      tabName: ExperimentPageTabName.ReviewQueue,
+      componentId: 'mlflow.experiment-side-nav.genai.review-queue',
+    },
+    {
+      label: (
+        <FormattedMessage
           defaultMessage="Datasets"
           description="Label for the datasets tab in the MLflow experiment navbar"
         />
@@ -82,6 +98,21 @@ const ExperimentPageSideNavGenAIConfig = {
     },
   ],
   'prompts-versions': [
+    ...(shouldEnableAIGateway()
+      ? [
+          {
+            label: (
+              <FormattedMessage
+                defaultMessage="Playground"
+                description="Label for the playground tab in the MLflow experiment navbar"
+              />
+            ),
+            icon: <PlayIcon />,
+            tabName: ExperimentPageTabName.Playground,
+            componentId: 'mlflow.experiment-side-nav.genai.playground',
+          },
+        ]
+      : []),
     {
       label: (
         <FormattedMessage

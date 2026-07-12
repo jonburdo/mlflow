@@ -26,7 +26,11 @@
     "graphql-codegen:base": "graphql-codegen --config ./src/graphql/graphql-codegen.ts",
     "graphql-codegen:clean": "find . -path '**/__generated__/*.ts' | xargs rm",
     "build:federated": "DEPLOYMENT_MODE=federated webpack --config config/webpack.federated.js",
-    "start:federated": "DEPLOYMENT_MODE=federated WEBPACK_WATCH=true webpack serve --config config/webpack.federated.js"
+    "start:federated": "DEPLOYMENT_MODE=federated WEBPACK_WATCH=true webpack serve --config config/webpack.federated.js",
+    "audit:css-overrides": "node scripts/audit-css-overrides.js",
+    "audit:css-overrides:update": "node scripts/audit-css-overrides.js --update-baseline",
+    "audit:rebase": "node scripts/audit-rebase.js",
+    "audit:rebase:update-versions": "node scripts/audit-rebase.js --update-versions"
   },
   "dependencies": {
     "@ag-grid-community/client-side-row-model": "^27.2.1",
@@ -37,6 +41,7 @@
     "@databricks/design-system": "file:./vendor/design-system",
     "@emotion/cache": "^11.11.0",
     "@emotion/react": "^11.11.3",
+    "@monaco-editor/react": "^4.6.0",
     "@openshift/dynamic-plugin-sdk": "^8.0.0",
     "@patternfly/patternfly": "^6.4.0",
     "@patternfly/react-tokens": "^6.4.0",
@@ -69,6 +74,7 @@
     "mod-arch-core": "^1.6.0",
     "mod-arch-kubeflow": "^1.2.1",
     "moment": "^2.29.4",
+    "monaco-editor": "^0.52.0",
     "pako": "0.2.7",
     "papaparse": "^5.3.2",
     "parcoord-es": "^2.2.10",
@@ -186,6 +192,7 @@
     "jest-canvas-mock": "^2.2.0",
     "jest-localstorage-mock": "^2.3.0",
     "knip": "^6.1.0",
+    "monaco-editor-webpack-plugin": "^7.1.0",
     "msw": "^1.2.3",
     "postcss-normalize": "^10.0.1",
     "prettier": "3.7.4",

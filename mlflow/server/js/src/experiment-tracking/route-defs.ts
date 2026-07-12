@@ -1,6 +1,7 @@
 import type { RouteHandle } from '../common/utils/RoutingUtils';
 import { createLazyRouteElement, DEFAULT_ASSISTANT_PROMPTS } from '../common/utils/RoutingUtils';
 
+import { shouldEnableAIGateway } from '../common/utils/FeatureUtils';
 import { PageId, RoutePaths } from './routes';
 
 const getPromptPagesRouteDefs = () => {
@@ -175,10 +176,18 @@ const getExperimentPageRouteDefs = () => {
           } satisfies RouteHandle,
         },
         {
+          path: RoutePaths.experimentPageTabReviewQueue,
+          pageId: PageId.experimentPageTabReviewQueue,
+          element: createLazyRouteElement(() => import('./pages/experiment-review-queue/ExperimentReviewQueuePage')),
+          handle: {
+            getPageTitle: (params) => `Review - Experiment ${params['experimentId']}`,
+          } satisfies RouteHandle,
+        },
+        {
           path: RoutePaths.experimentPageTabDatasets,
           pageId: PageId.experimentPageTabDatasets,
           element: createLazyRouteElement(() => {
-            return import('./pages/experiment-evaluation-datasets/ExperimentEvaluationDatasetsPage');
+            return import('./pages/experiment-evaluation-datasets-v2/ExperimentEvaluationDatasetsRouter');
           }),
           handle: {
             getPageTitle: (params) => `Datasets - Experiment ${params['experimentId']}`,
@@ -189,6 +198,34 @@ const getExperimentPageRouteDefs = () => {
             ],
           } satisfies RouteHandle,
         },
+        {
+          path: RoutePaths.experimentPageTabDatasetDetail,
+          pageId: PageId.experimentPageTabDatasetDetail,
+          element: createLazyRouteElement(() => {
+            return import('./pages/experiment-evaluation-datasets-v2/ExperimentEvaluationDatasetDetailPage');
+          }),
+          handle: {
+            getPageTitle: (params) => `Dataset ${params['datasetId']} - Experiment ${params['experimentId']}`,
+            getAssistantPrompts: () => [
+              'How to add a new record to this dataset?',
+              'How do I use this dataset for evaluation?',
+              'What format should my dataset be in?',
+            ],
+          } satisfies RouteHandle,
+        },
+        ...(shouldEnableAIGateway()
+          ? [
+              {
+                path: RoutePaths.experimentPageTabPlayground,
+                pageId: PageId.experimentPageTabPlayground,
+                element: createLazyRouteElement(() => import('./pages/playground/PlaygroundPage')),
+                handle: {
+                  getPageTitle: (params: Record<string, string | undefined>) =>
+                    `Playground - Experiment ${params['experimentId']}`,
+                } satisfies RouteHandle,
+              },
+            ]
+          : []),
         {
           path: RoutePaths.experimentPageTabPrompts,
           pageId: PageId.experimentPageTabPrompts,

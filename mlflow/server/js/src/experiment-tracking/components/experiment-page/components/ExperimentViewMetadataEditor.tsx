@@ -30,6 +30,7 @@ import { getExperimentApi, setExperimentTagApi, updateExperimentApi } from '../.
 import { getExperimentNameValidator } from '../../../../common/forms/validations';
 import { useInvalidateExperimentList } from '../hooks/useExperimentListQuery';
 import { canModifyExperiment, canRenameExperiment } from '../utils/experimentPage.common-utils';
+import { useHeaderVisibility } from '../../../pages/experiment-page-tabs/ExperimentPageHeaderVisibilityContext';
 import { useTraceArchivalEnabled } from '../../../hooks/useServerInfo';
 import {
   DEFAULT_TRACE_ARCHIVAL_RETENTION_UNIT,
@@ -186,6 +187,7 @@ export const ExperimentViewMetadataEditor = ({
 
   const dispatch = useDispatch<ThunkDispatch>();
   const invalidateExperimentList = useInvalidateExperimentList();
+  const { headerActionsHidden } = useHeaderVisibility();
   const canEditMetadata = canModifyExperiment(experiment);
   const canRename = canRenameExperiment(experiment);
   const traceArchivalEnabled = useTraceArchivalEnabled();
@@ -420,7 +422,7 @@ export const ExperimentViewMetadataEditor = ({
               dangerouslySetInnerHTML={{ __html: sanitizedContent }}
             />
           </div>
-          {canEditMetadata && (
+          {canEditMetadata && !headerActionsHidden && (
             <Button
               componentId="mlflow.experiment.metadata_editor.edit_button"
               data-testid="experiment-metadata-editor-edit-button"
@@ -448,6 +450,7 @@ export const ExperimentViewMetadataEditor = ({
       )}
       <Modal
         componentId="mlflow.experiment.metadata_editor.modal"
+        data-testid="edit-experiment-modal"
         title={
           <FormattedMessage
             defaultMessage="Edit experiment"
@@ -455,7 +458,7 @@ export const ExperimentViewMetadataEditor = ({
           />
         }
         visible={editing}
-        okButtonProps={{ loading: isSaving }}
+        okButtonProps={{ loading: isSaving, 'data-testid': 'edit-experiment-save-button' }}
         okText={
           <FormattedMessage defaultMessage="Save" description="experiment page > edit experiment modal > save button" />
         }
@@ -497,6 +500,7 @@ export const ExperimentViewMetadataEditor = ({
               </FormUI.Label>
               <Input
                 componentId="mlflow.experiment.edit.name"
+                data-testid="edit-experiment-name-input"
                 id="mlflow.experiment.edit.name"
                 value={tmpName}
                 onChange={(e) => {

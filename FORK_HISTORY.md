@@ -23,6 +23,107 @@ These break CI after every rebase. Fix them proactively before pushing.
 
 ---
 
+## Rebase: v3.13.0 → v3.14.0
+
+**Date:** 2026-07-09
+**Performed by:** Anya Kramar
+**Upstream tag:** `v3.14.0` (305 new commits from upstream)
+
+### Dropped commits (already in v3.14.0)
+
+| Original hash | Subject                                                                     | Upstream equivalent |
+| ------------- | --------------------------------------------------------------------------- | ------------------- |
+| `06cedb957`   | drop: Optimize local artifact uploads with atomic rename (#23794)           | `20f567a96`         |
+| `6497fb3ef`   | drop: Cherry-pick upstream test fixes for CI stability                      | Multiple            |
+| `e01db8f08`   | drop: Skip copying local artifacts to temp directories for artifact serving | `20f567a96`         |
+| `697f12f8a`   | drop: Fix HuggingFace revision test broken by datasets >= 4.8.5             | In v3.14.0          |
+| `4707d29bf`   | drop: Skip guardrails-ai while package is unavailable on PyPI               | `4cdfed1c5`         |
+| `55be94684`   | backport: Include workspace in webhook delivery envelopes (#22873)          | `0ba31551a`         |
+| `fae51223a`   | drop: Pin langchain-community<0.4.2 in genai CI job (#23697)                | `b20ae2163`         |
+
+### Squashed commits
+
+**Fork scaffolding** (5 commits):
+
+- `3e8519ed9` keep: Fork scaffolding (squashed) [from v3.13.0 rebase]
+- `b4d3741f3` Add Nana to approvers
+- `e45541f73` Bump memory in Konflux jobs due to OOM issue
+- `4b5d23d53` chore: add operator integration tests workflow
+- `dd2cc9b41` keep: Remove unused buildarg in Dockerfile
+
+**Backend changes** (7 commits — commit dropped as empty during rebase, content recovered):
+
+- `99684bd21` keep: Backend changes (squashed) [from v3.13.0 rebase]
+- `62aebd936` keep: Fix CVE-2026-48710 in ODH shipped dependencies
+- `7a2778fc0` keep: Restore kubernetes to Konflux AIPCC input
+- `220345109` keep: Sync UV lock file
+- `4adadfe9b` fix: bump mlflow-kubernetes-plugins to 1.3.0
+- `7dd659dc3` keep: Add downstream sync and operator version bump phases to rebase skill
+- `2ae6b5db0` keep: Add CSS override audit tooling and improve rebase skill
+
+**UI changes** (21 commits):
+
+- `7dbf3c3d7` keep: UI changes (squashed) [from v3.13.0 rebase]
+- `ce9016c16` keep: Post-rebase fixes and documentation
+- `05ebb6685` fix i18n check
+- `2284d44b8` Fix embedded compare runs link guard and fetch error handling
+- `3e9892995` Expose compare run page as a federated component
+- `47e6a2e0f` keep: lock Konflux sqlite runtime upgrade
+- `f00ae72b8` keep: Fix Prompts view buttons growing on viewport resize
+- `9700acd22` keep: Fix dark lines at the bottom of the LLM judge modals
+- `7520b39df` keep: update fsevents & es5-ext dependency resolutions
+- `df54fb8df` keep: Add event tracking to MLflow
+- `072ae3c4c` keep: Squashed commits from PRs #224 #226 #220
+- `221cb2ec4` keep: Fix the architecture typo in .yarnrc.yml
+- `d1c086041` keep: Hoist tooltip patch to root workspace
+- `f0ed22e8e` keep: Disable issue detection when the AI Gateway is disabled
+- `c0e329729` keep: Use only model plaintext for judge creation in ui
+- `10161e1b4` keep: Add PatternFly CSS overrides and module federation
+- `5ffb93d95` keep: Update to Node 24
+- `490cd77b5` keep: add MlflowTraceDetailWrapper for embedded trace view
+- `4e9d81bf0` keep: Use sentence case for experiment and prompt UI labels
+- `308d5d428` keep: add MlflowTraceDetailWrapper for embedded trace view
+- `8c4481956` keep: Add data-testid attributes to Edit Experiment modal
+
+### Conflict resolutions
+
+**Scaffolding commit (~30 conflicts):**
+
+All modify/delete — upstream-only CI workflows that ODH intentionally deletes. Resolved with `git rm`. Content conflict in `.github/workflows/master.yml`: removed upstream Databricks test step.
+
+**Backend commit:**
+
+Dropped as empty by git — `uv.lock` and `pyproject.toml` changes were already superseded by v3.14.0. Files that were grouped into this commit (CSS audit scripts, rebase skill files, PatternFly README) were recovered from `odh/master` via step 10b.
+
+**UI commit (4 content conflicts):**
+
+- `ExperimentViewHeader.tsx` — upstream added `headerActionsHidden` conditional wrapping; ODH added `!isEmbedded` guard on docs link. Merged both.
+- `ExperimentPageTabs.tsx` — upstream renamed `showExperimentPageSideNav` to `enableWorkflowBasedNavigation` and added `headerHidden`. Took upstream's version.
+- `en.json` — both sides added i18n keys. Took from `odh/master`, synced with `yarn i18n`.
+- `yarn.lock` — took from `odh/master`.
+
+### Post-rebase fixes
+
+- Recovered 20 downstream files silently dropped when backend commit was skipped
+- Restored ODH-specific `package.json` entries (PatternFly, module federation, audit scripts, Playwright)
+- Added upstream v3.14.0 Monaco editor dependencies (3 packages)
+- Synced i18n keys (2,092 new keys from v3.14.0, 32 orphaned removed)
+- Re-added `FORK_HISTORY.md` typos exclusion in `pyproject.toml`
+- Added top-level `permissions: {}` to 7 ODH workflows (conftest policy)
+- Updated CSS override verified versions
+- Updated rebase skill with step 10b (dropped-file detection)
+- Gated Playground tab and route behind `shouldEnableAIGateway()` — Playground requires the AI Gateway backend, so it should be hidden when `MLFLOW_ENABLE_AI_GATEWAY=false`
+- Passed MLflow version override (`SUPPORTED_MLFLOW_VERSION_OVERRIDE`) to the operator CI build to resolve the chicken-and-egg version mismatch during rebase PRs
+
+### Upstream test fixes cherry-picked
+
+| Commit    | Subject                                                         | Upstream PR                                           |
+| --------- | --------------------------------------------------------------- | ----------------------------------------------------- |
+| `8cbf564` | drop: Fix core tracing tests broken by opentelemetry-sdk 1.43.0 | [#24250](https://github.com/mlflow/mlflow/pull/24250) |
+| `45946ec` | drop: Match any non-zero exit code in `test_host_invalid_value` | [#24288](https://github.com/mlflow/mlflow/pull/24288) |
+
+---
+
 ## Rebase: v3.12.0 → v3.13.0
 
 **Date:** 2026-06-16
@@ -116,16 +217,9 @@ Additionally, `slow-tests.yml` (Docker model serving tests) and `helm.yml` (Helm
 
 - **`_scope-and-base-controls.scss`**: Removed global `align-self: center` from button override — it fought with form layouts (tags modal `+` button misaligned with inputs) and control bars (`+ New run` misaligned with kebab icon). Replaced with targeted `align-items: center` on the prompts detail action bar container only.
 
-**Upstream test fixes (cherry-picked, tagged `drop:` — will be dropped on next rebase):**
-
-- **`c5527114c`**: Bumps server-readiness retry budgets (10→30 attempts) in webhook and tracking tests.
-- **`5cce4c1da`** + **`c579fd459`**: Adds `.github/actions/cache-hf` to pre-warm HuggingFace dataset cache in CI; skips tests on HTTP 429.
-- **`1115b3e31`** (partial): Fixes `asyncio.get_event_loop()` → `asyncio.run()` in `test_tool_executor.py`. Only the test fix was applied, not the `uv.lock` regen.
-
 ### Late additions to master (merged after initial rebase)
 
-- **PR #281** (`25ffd0263`): `keep: Use sentence case for experiment and prompt UI labels`
-- **PR #308** (`490cd77b5`): `keep: add MlflowTraceDetailWrapper for embedded trace view`
+- **PR #281** (`25ffd0263`): `keep: Use sentence case for experiment and prompt UI labels` — merged to master after the rebase was prepared. Integrated via a second `merge -s ours` to link the updated master into the rebase branch.
 
 ### Notes
 
