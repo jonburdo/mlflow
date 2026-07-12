@@ -112,20 +112,15 @@ Dropped as empty by git — `uv.lock` and `pyproject.toml` changes were already 
 - Added top-level `permissions: {}` to 7 ODH workflows (conftest policy)
 - Updated CSS override verified versions
 - Updated rebase skill with step 10b (dropped-file detection)
+- Gated Playground tab and route behind `shouldEnableAIGateway()` — Playground requires the AI Gateway backend, so it should be hidden when `MLFLOW_ENABLE_AI_GATEWAY=false`
+- Passed MLflow version override (`SUPPORTED_MLFLOW_VERSION_OVERRIDE`) to the operator CI build to resolve the chicken-and-egg version mismatch during rebase PRs
 
-- Gated Playground tab and route behind `shouldEnableAIGateway()` — Playground requires the AI Gateway backend (`gateway/mlflow/v1/chat/completions`), so it should be hidden when `MLFLOW_ENABLE_AI_GATEWAY=false`
+### Upstream test fixes cherry-picked
 
-### Known upstream test failures (not fixed on upstream master)
-
-7 suites fail on v3.14.0 with no fix available on upstream `master`:
-
-- `TracesV3Logs.test.tsx`
-- `PromptsPage.test.tsx`
-- `RunEvaluationButton.test.tsx`
-- `GatewayUsagePage.test.tsx`
-- `ReviewQueueList.test.tsx`
-- `IssueDetectionModal.test.tsx`
-- `TraceCostBreakdownChart.test.tsx`
+| Commit    | Subject                                                         | Upstream PR                                           |
+| --------- | --------------------------------------------------------------- | ----------------------------------------------------- |
+| `8cbf564` | drop: Fix core tracing tests broken by opentelemetry-sdk 1.43.0 | [#24250](https://github.com/mlflow/mlflow/pull/24250) |
+| `45946ec` | drop: Match any non-zero exit code in `test_host_invalid_value` | [#24288](https://github.com/mlflow/mlflow/pull/24288) |
 
 ---
 
