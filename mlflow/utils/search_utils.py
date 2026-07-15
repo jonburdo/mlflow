@@ -2806,6 +2806,7 @@ class SearchMCPAccessEndpointUtils(SearchUtils):
     """Utility class for parsing MCP access endpoint search filters."""
 
     VALID_SEARCH_ATTRIBUTE_KEYS = {
+        "status",
         "server_name",
         "transport_type",
         "created_at",
