@@ -204,7 +204,16 @@ class CreateMCPServerVersionRequest(BaseModel):
     status: str = "draft"
     source: str | None = None
     tools: list[MCPToolRequestPayload] | None = Field(
-        default=None, max_length=_MAX_MCP_TOOLS_PER_LIST
+        default=None,
+        max_length=_MAX_MCP_TOOLS_PER_LIST,
+        description=(
+            "Optional tool definitions for this version. Omitting the field "
+            "(Python NOT_SET) best-effort auto-discovers tools from the first "
+            "discovery-eligible server_json.remotes[] URL; discovery failure "
+            "stores null tools and does not fail create. Explicit JSON null "
+            "stores no tools without discovery. Pass [] for an empty list, or "
+            "a tool list."
+        ),
     )
 
 
@@ -667,7 +676,11 @@ def create_mcp_server_version(
         )
     username = getattr(request.state, "username", None)
     status = _parse_status(body.status)
-    tools = _tool_payloads_to_entities(body.tools)
+    from mlflow.store.tracking.mcp_server_registry.abstract_mixin import NOT_SET
+
+    # Same value space as update: omitted → NOT_SET; present null → None; list → list.
+    # On create, NOT_SET means best-effort auto-discover (handled by the store).
+    tools = _tool_payloads_to_entities(body.tools) if "tools" in body.model_fields_set else NOT_SET
     server_json = body.server_json.model_dump(by_alias=True, exclude_unset=True)
     store = _get_tracking_store()
     _ensure_version_create_parent_access(store, name, username, request)

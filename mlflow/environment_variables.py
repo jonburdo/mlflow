@@ -622,6 +622,27 @@ MLFLOW_MULTIPART_DOWNLOAD_CHUNK_SIZE = _EnvironmentVariable(
 #: (default: ``True``)
 MLFLOW_ALLOW_HTTP_REDIRECTS = _BooleanEnvironmentVariable("MLFLOW_ALLOW_HTTP_REDIRECTS", True)
 
+#: Specifies whether create-time MCP registry tool auto-discovery is enabled.
+#: When ``True`` (default), omitting ``tools`` on MCP server version create
+#: best-effort scrapes the first discovery-eligible ``server_json.remotes[]``
+#: URL via ``mlflow[mcp]`` (failure leaves ``tools`` null; create still
+#: succeeds). When ``False``, omit/``NOT_SET`` stores null tools without
+#: network access (deployment kill switch for SSRF / air-gapped environments).
+#: Explicit ``tools`` values are unaffected.
+#: (default: ``True``)
+MLFLOW_ENABLE_MCP_TOOL_DISCOVERY = _BooleanEnvironmentVariable(
+    "MLFLOW_ENABLE_MCP_TOOL_DISCOVERY", True
+)
+
+#: Whether MCP tool discovery may target private or loopback hosts.
+#: Defaults to ``False`` (public hosts only) to reduce SSRF risk when the
+#: tracking server scrapes user-supplied remotes. Set ``true`` for local /
+#: private-network MCP servers.
+#: (default: ``False``)
+MLFLOW_MCP_TOOL_DISCOVERY_ALLOW_PRIVATE_IPS = _BooleanEnvironmentVariable(
+    "MLFLOW_MCP_TOOL_DISCOVERY_ALLOW_PRIVATE_IPS", False
+)
+
 #: Timeout for a SINGLE HTTP request to a deployment endpoint (in seconds).
 #: This controls how long ONE individual predict/predict_stream request can take before timing out.
 #: If your model inference takes longer than this (e.g., long-running agent queries that take

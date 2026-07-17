@@ -24,6 +24,7 @@ from mlflow.environment_variables import (
     MLFLOW_ICON_URL_ALLOW_PRIVATE_IPS,
     MLFLOW_ICON_URL_ALLOWED_DOMAINS,
     MLFLOW_ICON_URL_ALLOWED_SCHEMES,
+    MLFLOW_MCP_TOOL_DISCOVERY_ALLOW_PRIVATE_IPS,
     MLFLOW_TRUNCATE_LONG_VALUES,
 )
 from mlflow.exceptions import MlflowException
@@ -992,6 +993,28 @@ def _validate_public_https_url(
 
     if not allow_private_ips:
         _validate_hostname_resolves_to_public_ips(hostname, field_name)
+
+
+def _validate_mcp_tool_discovery_url(url: str) -> None:
+    """Validate a remote URL before MCP create-time tool discovery.
+
+    Accepts ``http``/``https`` only, rejects embedded credentials, and by
+    default requires the hostname to resolve to a public IP. Operators can set
+    ``MLFLOW_MCP_TOOL_DISCOVERY_ALLOW_PRIVATE_IPS=true`` for local / private
+    MCP servers.
+
+    Limitation (shared with icon/webhook URL checks): hostname resolution is
+    checked before connect. A DNS-rebinding answer can pass validation with a
+    public IP and later resolve to a private/loopback address on connect. Full
+    mitigation would require pinning the validated address into the HTTP
+    transport, which fastmcp does not expose today.
+    """
+    _validate_public_https_url(
+        url,
+        field_name="MCP remote URL",
+        allowed_schemes=("http", "https"),
+        allow_private_ips=MLFLOW_MCP_TOOL_DISCOVERY_ALLOW_PRIVATE_IPS.get(),
+    )
 
 
 def _validate_mcp_icon_url(url: str) -> None:

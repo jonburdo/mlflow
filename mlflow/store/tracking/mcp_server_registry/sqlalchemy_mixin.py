@@ -246,9 +246,11 @@ class SqlAlchemyMCPServerRegistryMixin:
         display_name: str | None = None,
         source: str | None = None,
         status: MCPStatus | None = None,
-        tools: list[MCPTool] | None = None,
+        tools: list[MCPTool] | None = NOT_SET,
         created_by: str | None = None,
     ) -> MCPServerVersion:
+        from mlflow.genai._mcp_tool_discovery import resolve_tools_for_create
+
         name = server_json.get("name")
         version = server_json.get("version")
         if not name or not version:
@@ -263,6 +265,8 @@ class SqlAlchemyMCPServerRegistryMixin:
         now = get_current_time_millis()
         status = status or MCPStatus.DRAFT
         _validate_mcp_initial_status(status)
+        # NOT_SET / omitted → best-effort auto-discover; explicit None → null.
+        tools = resolve_tools_for_create(server_json=server_json, tools=tools)
         _validate_tool_icons(tools)
         tools_json = None if tools is None else [t.to_dict() for t in tools]
 
