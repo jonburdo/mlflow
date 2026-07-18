@@ -10,7 +10,7 @@
 #
 #   python requirements/compile.py
 
-mlflow-kubernetes-plugins==1.4.0
+mlflow-kubernetes-plugins==1.5.0
 psycopg2
 prometheus-flask-exporter
 # Starlette 1.0.1+ is not yet available on the rhoai/3.4 AIPCC index.
