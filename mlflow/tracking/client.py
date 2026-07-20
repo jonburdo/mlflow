@@ -6823,7 +6823,7 @@ class MlflowClient:
         display_name: str | None = None,
         source: str | None = None,
         status: MCPStatus | None = None,
-        tools: list[MCPTool] | None = None,
+        tools: list[MCPTool] | None = NOT_SET,
     ) -> MCPServerVersion:
         return self._tracking_client.store.create_mcp_server_version(
             server_json=server_json,
