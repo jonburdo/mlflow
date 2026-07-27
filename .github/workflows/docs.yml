@@ -19,6 +19,7 @@ on:
       - pyproject.toml
       - mlflow/**
       - docs/**
+      - requirements/**
       - .github/workflows/docs.yml
 
 concurrency:

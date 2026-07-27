@@ -26,7 +26,7 @@ onnxruntime
 onnxscript
 tf2onnx
 # Required by mlflow.spark and using Delta with MLflow Tracking datasets
-pyspark
+pyspark<4.1.0
 # Required by mlflow.paddle
 paddlepaddle
 # Required by mlflow.prophet
@@ -69,7 +69,8 @@ sentence-transformers
 # Required by mlflow.anthropic
 anthropic
 # Required by mlflow.ag2
-ag2
+# ag2 1.0.0 renamed the import path from `autogen` to `ag2`
+ag2>=0.7.0,<1
 # Required by mlflow.dspy
 # The rhoai-3.3 branch still targets the pre-3.x DSPy API surface.
 dspy @ git+https://github.com/stanfordnlp/dspy.git@2.6.24
@@ -90,4 +91,5 @@ agno
 # Required by mlflow.strands
 strands-agents
 # Required by mlflow.haystack
-haystack-ai
+# haystack-ai 3.0.0 removed OpenTelemetryTracer used by mlflow.haystack
+haystack-ai>=2.0.0,<3
