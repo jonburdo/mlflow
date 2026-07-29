@@ -11,19 +11,6 @@ const buildSegments = (pathname: string): BreadcrumbSegment[] => {
     return [];
   }
 
-  const bindingDetailMatch = matchPath('/:serverName/bindings/:bindingId', pathname);
-  if (bindingDetailMatch) {
-    const { serverName, bindingId } = bindingDetailMatch.params as {
-      serverName: string;
-      bindingId: string;
-    };
-    const decoded = decodeURIComponent(serverName);
-    return [
-      { label: decoded, path: `/${serverName}` },
-      { label: `Endpoint ${bindingId.slice(0, 8)}`, path: `/${serverName}/bindings/${bindingId}` },
-    ];
-  }
-
   const serverDetailMatch = matchPath('/:serverName', pathname);
   if (serverDetailMatch) {
     const { serverName } = serverDetailMatch.params as { serverName: string };

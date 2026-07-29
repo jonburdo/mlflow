@@ -8,9 +8,5 @@ export const getMcpRegistryRouteElements = () => (
       path=":serverName"
       element={createLazyRouteElement(() => import('../../mcp-registry/pages/MCPServerDetailPage'))}
     />
-    <Route
-      path=":serverName/bindings/:bindingId"
-      element={createLazyRouteElement(() => import('../../mcp-registry/pages/MCPAccessBindingDetailPage'))}
-    />
   </>
 );
