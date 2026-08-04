@@ -6,7 +6,7 @@ kubernetes>=29.0.0
 # Security constraints for shipped image CVEs.
 pillow>=12.3.0
 gitpython>=3.1.47
-# Starlette 1.0.1+ fixes CVE-2026-48710 in the shipped runtime image.
-starlette>=1.0.1,<2
+# Starlette 1.3.1+ fixes CVE-2026-54283 (urlencoded form limits) in the shipped runtime image.
+starlette>=1.3.1,<2
 # pyasn1 0.6.4+ fixes CVE-2026-59884 in the shipped runtime image.
 pyasn1>=0.6.4
