@@ -24,11 +24,14 @@ import { useMLflowDarkTheme } from './common/hooks/useMLflowDarkTheme';
 import { DarkThemeProvider } from './common/contexts/DarkThemeContext';
 import { telemetryClient } from './telemetry';
 import { ServerInfoProvider } from './experiment-tracking/hooks/useServerInfo';
+import { enableSessionExpiryHandling } from './common/utils/fetchWithSessionExpiry';
 
 // Note: In federated mode (Module Federation), app.tsx is NOT in the bundle --
 // the federated entry point (src/odh/extensions.ts) imports wrappers directly,
 // bypassing MLFlowRoot. So this CSS import only executes in standalone mode.
 import '@patternfly/patternfly/patternfly.css';
+
+enableSessionExpiryHandling();
 
 const modularArchConfig: ModularArchConfig = {
   deploymentMode: DeploymentMode.Standalone,

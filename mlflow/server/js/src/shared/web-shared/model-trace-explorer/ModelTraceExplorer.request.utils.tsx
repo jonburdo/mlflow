@@ -1,7 +1,9 @@
 import { getActiveWorkspace } from './RoutingUtils';
 import { matchPredefinedError } from '../errors/PredefinedErrors';
 import { prefixApiUrl } from '@mlflow/mlflow/src/common/utils/embedUtils';
+import { fetchWithSessionExpiry } from '@mlflow/mlflow/src/common/utils/fetchWithSessionExpiry';
 
+// Keep the same module-load binding used by this shared package so MSW can intercept it in tests.
 // eslint-disable-next-line no-restricted-globals -- See go/spog-fetch
 const fetchFn = fetch;
 
@@ -32,7 +34,7 @@ export const fetchAPI = async (
   if (body) {
     options.body = serializeRequestBody(body);
   }
-  const response = await fetchFn(url, options);
+  const response = await fetchWithSessionExpiry(url, options, fetchFn);
 
   if (!response.ok) {
     const predefinedError = matchPredefinedError(response);
