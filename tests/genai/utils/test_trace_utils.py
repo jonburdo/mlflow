@@ -1,12 +1,13 @@
+import importlib.metadata
 import json
 from typing import Any
 from unittest import mock
 
-import httpx
 import numpy as np
 import openai
 import pytest
 from opentelemetry.sdk.trace import ReadableSpan as OTelReadableSpan
+from packaging.version import Version
 
 import mlflow
 from mlflow.entities.assessment import Expectation
@@ -33,8 +34,19 @@ from mlflow.tracing.utils import build_otel_context
 from tests.tracing.helper import create_test_trace_info, get_traces, purge_traces
 
 
-def httpx_send_patch(request, *args, **kwargs):
-    return httpx.Response(
+def get_openai_http_client_module():
+    # OpenAI 3.x uses the separately distributed ``httpx2`` package, while
+    # older versions use ``httpx``.
+    if Version(importlib.metadata.version("openai")).major >= 3:
+        import httpx2 as http_client
+    else:
+        import httpx as http_client
+
+    return http_client
+
+
+def httpx_send_patch(http_client, request):
+    return http_client.Response(
         status_code=200,
         request=request,
         json={
@@ -63,8 +75,13 @@ def get_openai_predict_fn(with_tracing=False):
         mlflow.openai.autolog()
 
     def predict_fn(request):
-        with mock.patch("httpx.Client.send", side_effect=httpx_send_patch):
-            response = openai.OpenAI().chat.completions.create(
+        http_client = get_openai_http_client_module()
+        transport = http_client.MockTransport(
+            lambda request: httpx_send_patch(http_client, request)
+        )
+        with http_client.Client(transport=transport) as transport_client:
+            client = openai.OpenAI(http_client=transport_client)
+            response = client.chat.completions.create(
                 messages=request["messages"],
                 model="gpt-4o-mini",
             )
