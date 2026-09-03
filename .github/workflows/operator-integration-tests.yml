@@ -98,6 +98,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Log in to Red Hat registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: registry.redhat.io
+          username: ${{ secrets.RH_REGISTRY_USERNAME }}
+          password: ${{ secrets.RH_REGISTRY_PASSWORD }}
+
       - name: Resolve MLflow Dockerfile
         id: dockerfile
         run: |
@@ -136,6 +143,13 @@ jobs:
           repository: ${{ needs.resolve-operator-ref.outputs.operator_repository }}
           ref: ${{ needs.resolve-operator-ref.outputs.operator_branch }}
           persist-credentials: false
+
+      - name: Log in to Red Hat registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: registry.redhat.io
+          username: ${{ secrets.RH_REGISTRY_USERNAME }}
+          password: ${{ secrets.RH_REGISTRY_PASSWORD }}
 
       - name: Checkout MLflow pyproject.toml
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
