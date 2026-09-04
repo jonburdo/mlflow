@@ -1,0 +1,69 @@
+name: Restore Base Image
+description: Restore, verify, and load a cached digest-pinned base image for a PR build.
+
+inputs:
+  dockerfile:
+    description: Dockerfile containing the approved ARG BASE_IMAGE declaration.
+    required: true
+  cache-path:
+    description: Directory in which the image archive is cached.
+    required: true
+
+outputs:
+  local-tag:
+    description: Locally loaded image tag for use as the BASE_IMAGE build argument.
+    value: ${{ steps.resolve.outputs.local_tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve and validate base image
+      id: resolve
+      shell: bash
+      env:
+        DOCKERFILE: ${{ inputs.dockerfile }}
+      run: |
+        set -euo pipefail
+        base_image=$(sed -nE 's/^ARG BASE_IMAGE=(.+)$/\1/p' "$DOCKERFILE")
+        # Tags alone are mutable and cannot safely identify a cache entry.
+        # A tag plus @sha256 is valid.
+        if ! [[ "$base_image" =~ ^[^[:space:]@]+@sha256:([0-9a-f]{64})$ ]]; then
+          echo "::error::${DOCKERFILE} must contain one digest-pinned base image reference"
+          exit 1
+        fi
+        digest="${BASH_REMATCH[1]}"
+        echo "cache_key=base-image-${RUNNER_OS,,}-${RUNNER_ARCH,,}-$digest" >> "$GITHUB_OUTPUT"
+        echo "expected_ref=$base_image" >> "$GITHUB_OUTPUT"
+        echo "local_tag=localhost/base-image:${digest:0:12}" >> "$GITHUB_OUTPUT"
+        echo "Resolved base image: $base_image"
+
+    - name: Restore cached base image
+      id: cache
+      uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: ${{ inputs.cache-path }}
+        key: ${{ steps.resolve.outputs.cache_key }}
+
+    - name: Verify and load cached base image
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        CACHE_PATH: ${{ inputs.cache-path }}
+        CACHE_KEY: ${{ steps.resolve.outputs.cache_key }}
+        EXPECTED_REF: ${{ steps.resolve.outputs.expected_ref }}
+        LOCAL_TAG: ${{ steps.resolve.outputs.local_tag }}
+      run: |
+        set -euo pipefail
+        if [[ "$CACHE_HIT" != "true" ]]; then
+          echo "::error::Cached base image is unavailable for $EXPECTED_REF (key: $CACHE_KEY). " \
+            "A trusted publisher may still be running; rerun after it completes."
+          exit 1
+        fi
+        (
+          cd "$CACHE_PATH"
+          sha256sum -c SHA256SUMS
+        )
+        test "$(<"$CACHE_PATH/expected-ref.txt")" = "$EXPECTED_REF"
+        test "$(<"$CACHE_PATH/local-tag.txt")" = "$LOCAL_TAG"
+        docker load -i "$CACHE_PATH/base-image.tar"
+        docker image inspect "$LOCAL_TAG" --format 'Loaded local image ID: {{.Id}}'
