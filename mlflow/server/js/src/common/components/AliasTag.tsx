@@ -3,7 +3,7 @@ import type { TagProps } from '@databricks/design-system';
 
 type ModelVersionAliasTagProps = { value: string; compact?: boolean } & Pick<
   TagProps,
-  'closable' | 'onClose' | 'className' | 'color'
+  'closable' | 'onClose' | 'className'
 >;
 
 // When displayed in compact mode (e.g. within <Select>), constrain the width to 160 pixels
@@ -11,14 +11,7 @@ const COMPACT_MODE_MAX_WIDTH = 160;
 const REGULAR_MAX_WIDTH = 300;
 const TAG_SYMBOL = '@';
 
-export const AliasTag = ({
-  value,
-  closable,
-  onClose,
-  className,
-  compact = false,
-  color,
-}: ModelVersionAliasTagProps) => {
+export const AliasTag = ({ value, closable, onClose, className, compact = false }: ModelVersionAliasTagProps) => {
   const { theme } = useDesignSystemTheme();
   return (
     <Tag
@@ -31,7 +24,6 @@ export const AliasTag = ({
       closable={closable}
       onClose={onClose}
       title={value}
-      color={color}
     >
       <span
         css={{

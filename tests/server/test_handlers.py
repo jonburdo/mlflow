@@ -233,6 +233,7 @@ from mlflow.server.handlers import (
     _update_registered_model,
     _update_review_queue,
     _update_workspace_handler,
+    _upload_artifact,
     _upsert_dataset_records_handler,
     _validate_source_run,
     catch_mlflow_exception,
@@ -247,8 +248,13 @@ from mlflow.server.handlers import (
     upload_artifact_handler,
 )
 from mlflow.store._unity_catalog.registry.rest_store import UcModelRegistryStore
+from mlflow.store.artifact.artifact_repo import ArtifactRepository
 from mlflow.store.artifact.azure_blob_artifact_repo import AzureBlobArtifactRepository
 from mlflow.store.artifact.local_artifact_repo import LocalArtifactRepository
+from mlflow.store.artifact.mlflow_artifacts_repo import (
+    SERVER_INFO_MULTIPART_DOWNLOADS_ENABLED,
+    SERVER_INFO_MULTIPART_UPLOADS_ENABLED,
+)
 from mlflow.store.artifact.s3_artifact_repo import S3ArtifactRepository
 from mlflow.store.entities.paged_list import PagedList
 from mlflow.store.model_registry import (
@@ -466,6 +472,75 @@ def test_server_info_handles_unexpected_trace_archival_config_error(monkeypatch)
         assert response.status_code == 200
         data = response.get_json()
         assert data["trace_archival_enabled"] is False
+
+
+def test_server_info_multipart_capabilities_disabled_by_default():
+    with app.test_client() as c:
+        response = c.get("/api/3.0/mlflow/server-info")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data[SERVER_INFO_MULTIPART_UPLOADS_ENABLED] is False
+        assert data[SERVER_INFO_MULTIPART_DOWNLOADS_ENABLED] is False
+
+
+def test_server_info_multipart_capabilities_with_multipart_backend(monkeypatch):
+    from mlflow.store.artifact.artifact_repo import MultipartDownloadMixin, MultipartUploadMixin
+
+    class _FakeMultipartArtifactRepo(MultipartUploadMixin, MultipartDownloadMixin):
+        def create_multipart_upload(self, local_file, num_parts, artifact_path=None):
+            raise NotImplementedError
+
+        def complete_multipart_upload(self, local_file, upload_id, parts, artifact_path=None):
+            raise NotImplementedError
+
+        def abort_multipart_upload(self, local_file, upload_id, artifact_path=None):
+            raise NotImplementedError
+
+        def get_download_presigned_url(self, artifact_path, expiration=300):
+            raise NotImplementedError
+
+    monkeypatch.setattr("mlflow.server.handlers._is_serving_proxied_artifacts", lambda: True)
+    monkeypatch.setattr(
+        "mlflow.server.handlers._get_artifact_repo_mlflow_artifacts",
+        lambda: _FakeMultipartArtifactRepo(),
+    )
+
+    with app.test_client() as c:
+        response = c.get("/api/3.0/mlflow/server-info")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data[SERVER_INFO_MULTIPART_UPLOADS_ENABLED] is True
+        assert data[SERVER_INFO_MULTIPART_DOWNLOADS_ENABLED] is True
+
+
+def test_server_info_multipart_capabilities_with_local_backend(monkeypatch):
+    monkeypatch.setattr("mlflow.server.handlers._is_serving_proxied_artifacts", lambda: True)
+    monkeypatch.setattr(
+        "mlflow.server.handlers._get_artifact_repo_mlflow_artifacts",
+        lambda: mock.Mock(spec=[]),
+    )
+
+    with app.test_client() as c:
+        response = c.get("/api/3.0/mlflow/server-info")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data[SERVER_INFO_MULTIPART_UPLOADS_ENABLED] is False
+        assert data[SERVER_INFO_MULTIPART_DOWNLOADS_ENABLED] is False
+
+
+def test_server_info_multipart_capabilities_handles_repo_error(monkeypatch):
+    monkeypatch.setattr("mlflow.server.handlers._is_serving_proxied_artifacts", lambda: True)
+    monkeypatch.setattr(
+        "mlflow.server.handlers._get_artifact_repo_mlflow_artifacts",
+        mock.Mock(side_effect=KeyError("ARTIFACTS_DESTINATION")),
+    )
+
+    with app.test_client() as c:
+        response = c.get("/api/3.0/mlflow/server-info")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data[SERVER_INFO_MULTIPART_UPLOADS_ENABLED] is False
+        assert data[SERVER_INFO_MULTIPART_DOWNLOADS_ENABLED] is False
 
 
 def test_get_endpoints():
@@ -1254,6 +1329,49 @@ def test_get_presigned_download_url_success(enable_serve_artifacts, monkeypatch)
     assert data["headers"] == {"x-custom-header": "value"}
     assert data["file_size"] == 1024
     assert artifact_repo.artifact_path == "workspaces/team-a/run_id/artifacts/model.pkl"
+
+
+def test_get_presigned_download_url_applies_workspace_scoping(enable_serve_artifacts, monkeypatch):
+    from mlflow.store.artifact.artifact_repo import MultipartDownloadMixin
+
+    monkeypatch.setenv(MLFLOW_ENABLE_WORKSPACES.name, "true")
+    seen_paths = []
+
+    class MockMultipartDownloadRepo(MultipartDownloadMixin):
+        def get_download_presigned_url(self, artifact_path, expiration=300):
+            seen_paths.append(artifact_path)
+            return PresignedDownloadUrlResponse(
+                url="https://storage.example.com/presigned?token=abc",
+                headers={},
+                file_size=1024,
+            )
+
+    with (
+        app.test_request_context(method="GET"),
+        WorkspaceContext("team-blue"),
+        mock.patch(
+            "mlflow.server.handlers._get_artifact_repo_mlflow_artifacts",
+            return_value=MockMultipartDownloadRepo(),
+        ),
+    ):
+        response = _get_presigned_download_url("2/new/artifact/model.pkl")
+
+    assert response.status_code == 200
+    assert seen_paths == ["workspaces/team-blue/2/new/artifact/model.pkl"]
+
+
+def test_get_presigned_download_url_rejects_cross_workspace_path(
+    enable_serve_artifacts, monkeypatch
+):
+    monkeypatch.setenv(MLFLOW_ENABLE_WORKSPACES.name, "true")
+
+    with app.test_request_context(method="GET"), WorkspaceContext("team-a"):
+        response = _get_presigned_download_url("workspaces/team-b/secret.txt")
+
+    assert response.status_code == 400
+    json_response = json.loads(response.get_data())
+    assert json_response["error_code"] == ErrorCode.Name(INVALID_PARAMETER_VALUE)
+    assert "targets workspace 'team-b'" in json_response["message"]
 
 
 @pytest.mark.parametrize(
@@ -3714,7 +3832,8 @@ def test_query_trace_metrics_handler_empty_result(mock_get_request_message, mock
     assert response_data == {}
 
 
-def test_invoke_scorer_missing_experiment_id():
+def test_invoke_scorer_missing_experiment_id(monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     with app.test_client() as c:
         response = c.post(
             "/ajax-api/3.0/mlflow/scorer/invoke",
@@ -3725,7 +3844,8 @@ def test_invoke_scorer_missing_experiment_id():
         assert "experiment_id" in data["message"]
 
 
-def test_invoke_scorer_missing_serialized_scorer():
+def test_invoke_scorer_missing_serialized_scorer(monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     with app.test_client() as c:
         response = c.post(
             "/ajax-api/3.0/mlflow/scorer/invoke",
@@ -3736,7 +3856,8 @@ def test_invoke_scorer_missing_serialized_scorer():
         assert "serialized_scorer" in data["message"]
 
 
-def test_invoke_scorer_missing_trace_ids():
+def test_invoke_scorer_missing_trace_ids(monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     with app.test_client() as c:
         response = c.post(
             "/ajax-api/3.0/mlflow/scorer/invoke",
@@ -3747,7 +3868,8 @@ def test_invoke_scorer_missing_trace_ids():
         assert "Please select at least one trace to evaluate" in data["message"]
 
 
-def test_invoke_scorer_submits_jobs(mock_tracking_store):
+def test_invoke_scorer_submits_jobs(mock_tracking_store, monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     serialized_scorer = json.dumps({
         "name": "test_judge",
         "aggregations": [],
@@ -3793,6 +3915,64 @@ def test_invoke_scorer_submits_jobs(mock_tracking_store):
             assert data["jobs"][0]["trace_ids"] == ["trace1", "trace2"]
 
         mock_submit.assert_called_once()
+
+
+def test_invoke_scorer_rejects_decorator_scorer(monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
+    from mlflow.genai.scorers.scorer_utils import DECORATOR_SCORER_REGISTRATION_NOT_SUPPORTED_ERROR
+
+    serialized_scorer = json.dumps({
+        "name": "pwned",
+        "call_source": "    import os; os.system('touch /tmp/pwned')\n",
+        "call_signature": "(inputs, outputs)",
+        "original_func_name": "pwned",
+    })
+
+    with mock.patch("mlflow.server.jobs.submit_job") as mock_submit:
+        with app.test_client() as c:
+            response = c.post(
+                "/ajax-api/3.0/mlflow/scorer/invoke",
+                json={
+                    "experiment_id": "exp-123",
+                    "serialized_scorer": serialized_scorer,
+                    "trace_ids": ["trace1"],
+                },
+            )
+        assert response.status_code == 400
+        assert DECORATOR_SCORER_REGISTRATION_NOT_SUPPORTED_ERROR in response.get_json()["message"]
+        mock_submit.assert_not_called()
+
+
+def test_invoke_scorer_rejects_invalid_json(monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
+    with app.test_client() as c:
+        response = c.post(
+            "/ajax-api/3.0/mlflow/scorer/invoke",
+            json={
+                "experiment_id": "exp-123",
+                "serialized_scorer": "not valid json",
+                "trace_ids": ["trace1"],
+            },
+        )
+    assert response.status_code == 400
+    assert "serialized_scorer must be valid JSON" in response.get_json()["message"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/ajax-api/3.0/mlflow/issues/invoke",
+        "/ajax-api/3.0/mlflow/genai/evaluate/invoke",
+        "/ajax-api/3.0/mlflow/scorer/invoke",
+    ],
+)
+def test_job_invocation_endpoints_are_disabled_without_gateway(monkeypatch, path):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "false")
+
+    with app.test_client() as c:
+        response = c.post(path, json={})
+
+    assert response.status_code == 501
 
 
 def test_get_ui_telemetry_handler(
@@ -4118,6 +4298,50 @@ def test_download_artifact_uses_local_path_fast_path(enable_serve_artifacts, tmp
     mock_artifact_repo.get_local_path.assert_called_once_with(artifact_path)
     mock_artifact_repo.download_artifacts.assert_not_called()
     mock_tmp_dir.assert_not_called()
+
+
+def test_upload_artifact_uses_stream_upload_when_mixin_supported(enable_serve_artifacts):
+    artifact_path = "nested/model.pkl"
+    test_data = b"streamed artifact"
+
+    with (
+        app.test_request_context(
+            method="PUT", data=test_data, content_type="application/octet-stream"
+        ),
+        mock.patch("mlflow.server.handlers._get_artifact_repo_mlflow_artifacts") as mock_repo,
+    ):
+        mock_artifact_repo = mock.MagicMock(spec=LocalArtifactRepository)
+        mock_repo.return_value = mock_artifact_repo
+
+        response = _upload_artifact(artifact_path)
+
+    mock_artifact_repo.log_artifact_from_stream.assert_called_once()
+    args, kwargs = mock_artifact_repo.log_artifact_from_stream.call_args
+    assert args[1] == "model.pkl"
+    assert kwargs["artifact_path"] == "nested"
+    assert response.status_code == 200
+
+
+def test_upload_artifact_falls_back_to_log_artifact_without_mixin(enable_serve_artifacts):
+    artifact_path = "nested/model.pkl"
+    test_data = b"streamed artifact"
+
+    with (
+        app.test_request_context(
+            method="PUT", data=test_data, content_type="application/octet-stream"
+        ),
+        mock.patch("mlflow.server.handlers._get_artifact_repo_mlflow_artifacts") as mock_repo,
+    ):
+        mock_artifact_repo = mock.MagicMock(spec=ArtifactRepository)
+        mock_repo.return_value = mock_artifact_repo
+
+        response = _upload_artifact(artifact_path)
+
+    mock_artifact_repo.log_artifact.assert_called_once()
+    args, kwargs = mock_artifact_repo.log_artifact.call_args
+    assert args[0].endswith("model.pkl")
+    assert kwargs["artifact_path"] == "nested"
+    assert response.status_code == 200
 
 
 def test_download_artifact_streams_in_chunks(enable_serve_artifacts, tmp_path):
@@ -5375,6 +5599,241 @@ def test_list_budget_windows_no_workspace_returns_all():
     assert policy_ids == {"bp-global", "bp-ws"}
 
 
+# ==================== Per-endpoint Budget Policy Tests ====================
+
+
+def _make_endpoint_budget_policy(
+    budget_policy_id="bp-ep",
+    target_value="ep-1",
+    budget_amount=100.0,
+    workspace=None,
+):
+    return GatewayBudgetPolicy(
+        budget_policy_id=budget_policy_id,
+        budget_unit=BudgetUnit.USD,
+        budget_amount=budget_amount,
+        duration=BudgetDuration(unit=BudgetDurationUnit.DAYS, value=1),
+        target_scope=BudgetTargetScope.ENDPOINT,
+        budget_action=BudgetAction.REJECT,
+        created_at=0,
+        last_updated_at=0,
+        target_value=target_value,
+        workspace=workspace,
+    )
+
+
+def test_create_budget_policy_endpoint_scope():
+    created = _make_endpoint_budget_policy(target_value="ep-1")
+    store = mock.MagicMock()
+    store.create_budget_policy.return_value = created
+
+    with (
+        app.test_client() as c,
+        mock.patch("mlflow.server.handlers._get_tracking_store", return_value=store),
+        mock.patch("mlflow.server.handlers.get_budget_tracker"),
+        mock.patch("mlflow.server.handlers.maybe_refresh_budget_policies"),
+    ):
+        response = c.post(
+            "/ajax-api/3.0/mlflow/gateway/budgets/create",
+            json={
+                "budget_unit": "USD",
+                "budget_amount": 100.0,
+                "duration": {"unit": "DAYS", "value": 1},
+                "target_scope": "ENDPOINT",
+                "budget_action": "REJECT",
+                "target_value": "ep-1",
+            },
+        )
+
+    assert response.status_code == 200
+    store.create_budget_policy.assert_called_once()
+    assert store.create_budget_policy.call_args.kwargs["target_value"] == "ep-1"
+    assert response.json["budget_policy"]["target_scope"] == "ENDPOINT"
+    assert response.json["budget_policy"]["target_value"] == "ep-1"
+
+
+def test_create_budget_policy_endpoint_scope_missing_target_value_returns_400():
+    store = mock.MagicMock()
+    with (
+        app.test_client() as c,
+        mock.patch("mlflow.server.handlers._get_tracking_store", return_value=store),
+        mock.patch("mlflow.server.handlers.get_budget_tracker"),
+        mock.patch("mlflow.server.handlers.maybe_refresh_budget_policies"),
+    ):
+        response = c.post(
+            "/ajax-api/3.0/mlflow/gateway/budgets/create",
+            json={
+                "budget_unit": "USD",
+                "budget_amount": 100.0,
+                "duration": {"unit": "DAYS", "value": 1},
+                "target_scope": "ENDPOINT",
+                "budget_action": "REJECT",
+            },
+        )
+
+    assert response.status_code == 400
+    assert "target_value is required" in response.json["message"]
+    store.create_budget_policy.assert_not_called()
+
+
+def test_create_budget_policy_untargeted_with_target_value_returns_400():
+    store = mock.MagicMock()
+    with (
+        app.test_client() as c,
+        mock.patch("mlflow.server.handlers._get_tracking_store", return_value=store),
+        mock.patch("mlflow.server.handlers.get_budget_tracker"),
+        mock.patch("mlflow.server.handlers.maybe_refresh_budget_policies"),
+    ):
+        response = c.post(
+            "/ajax-api/3.0/mlflow/gateway/budgets/create",
+            json={
+                "budget_unit": "USD",
+                "budget_amount": 100.0,
+                "duration": {"unit": "DAYS", "value": 1},
+                "target_scope": "GLOBAL",
+                "budget_action": "REJECT",
+                "target_value": "ep-1",
+            },
+        )
+
+    assert response.status_code == 400
+    assert "target_value can only be set" in response.json["message"]
+    store.create_budget_policy.assert_not_called()
+
+
+def test_update_budget_policy_endpoint_scope():
+    updated = _make_endpoint_budget_policy(target_value="ep-2")
+    store = mock.MagicMock()
+    store.get_budget_policy.return_value = _make_endpoint_budget_policy(target_value="ep-1")
+    store.update_budget_policy.return_value = updated
+
+    with (
+        app.test_client() as c,
+        mock.patch("mlflow.server.handlers._get_tracking_store", return_value=store),
+        mock.patch("mlflow.server.handlers.get_budget_tracker"),
+        mock.patch("mlflow.server.handlers.maybe_refresh_budget_policies"),
+    ):
+        response = c.post(
+            "/ajax-api/3.0/mlflow/gateway/budgets/update",
+            json={
+                "budget_policy_id": "bp-ep",
+                "target_scope": "ENDPOINT",
+                "target_value": "ep-2",
+            },
+        )
+
+    assert response.status_code == 200
+    store.update_budget_policy.assert_called_once()
+    assert store.update_budget_policy.call_args.kwargs["target_value"] == "ep-2"
+
+
+def test_update_budget_policy_target_value_alone_on_endpoint_policy():
+    # Updating just the target of an ENDPOINT policy must not require echoing
+    # the scope back.
+    store = mock.MagicMock()
+    store.get_budget_policy.return_value = _make_endpoint_budget_policy(target_value="ep-1")
+    store.update_budget_policy.return_value = _make_endpoint_budget_policy(target_value="ep-2")
+
+    with (
+        app.test_client() as c,
+        mock.patch("mlflow.server.handlers._get_tracking_store", return_value=store),
+        mock.patch("mlflow.server.handlers.get_budget_tracker"),
+        mock.patch("mlflow.server.handlers.maybe_refresh_budget_policies"),
+    ):
+        response = c.post(
+            "/ajax-api/3.0/mlflow/gateway/budgets/update",
+            json={"budget_policy_id": "bp-ep", "target_value": "ep-2"},
+        )
+
+    assert response.status_code == 200
+    assert store.update_budget_policy.call_args.kwargs["target_value"] == "ep-2"
+
+
+def test_update_budget_policy_target_value_on_global_policy_returns_400():
+    store = mock.MagicMock()
+    store.get_budget_policy.return_value = _make_budget_policy(budget_policy_id="bp-1")
+
+    with (
+        app.test_client() as c,
+        mock.patch("mlflow.server.handlers._get_tracking_store", return_value=store),
+        mock.patch("mlflow.server.handlers.get_budget_tracker"),
+        mock.patch("mlflow.server.handlers.maybe_refresh_budget_policies"),
+    ):
+        response = c.post(
+            "/ajax-api/3.0/mlflow/gateway/budgets/update",
+            json={"budget_policy_id": "bp-1", "target_value": "ep-2"},
+        )
+
+    assert response.status_code == 400
+    assert "target_value can only be set" in response.json["message"]
+    store.update_budget_policy.assert_not_called()
+
+
+def test_update_budget_policy_scope_echo_keeps_existing_target_value():
+    # Clients that round-trip the current scope (GET -> tweak amount -> UPDATE)
+    # must not be forced to also echo target_value: the existing one counts.
+    store = mock.MagicMock()
+    store.get_budget_policy.return_value = _make_endpoint_budget_policy(target_value="ep-1")
+    store.update_budget_policy.return_value = _make_endpoint_budget_policy(target_value="ep-1")
+
+    with (
+        app.test_client() as c,
+        mock.patch("mlflow.server.handlers._get_tracking_store", return_value=store),
+        mock.patch("mlflow.server.handlers.get_budget_tracker"),
+        mock.patch("mlflow.server.handlers.maybe_refresh_budget_policies"),
+    ):
+        response = c.post(
+            "/ajax-api/3.0/mlflow/gateway/budgets/update",
+            json={"budget_policy_id": "bp-ep", "target_scope": "ENDPOINT", "budget_amount": 42.0},
+        )
+
+    assert response.status_code == 200
+    store.update_budget_policy.assert_called_once()
+
+
+def test_update_budget_policy_switch_to_endpoint_requires_target_value():
+    store = mock.MagicMock()
+    store.get_budget_policy.return_value = _make_budget_policy(budget_policy_id="bp-1")
+
+    with (
+        app.test_client() as c,
+        mock.patch("mlflow.server.handlers._get_tracking_store", return_value=store),
+        mock.patch("mlflow.server.handlers.get_budget_tracker"),
+        mock.patch("mlflow.server.handlers.maybe_refresh_budget_policies"),
+    ):
+        response = c.post(
+            "/ajax-api/3.0/mlflow/gateway/budgets/update",
+            json={"budget_policy_id": "bp-1", "target_scope": "ENDPOINT"},
+        )
+
+    assert response.status_code == 400
+    assert "target_value is required" in response.json["message"]
+    store.update_budget_policy.assert_not_called()
+
+
+def test_list_budget_windows_workspace_scoped_filters_endpoint_policies():
+    tracker = InMemoryBudgetTracker()
+    ep_team_a = _make_endpoint_budget_policy(
+        budget_policy_id="bp-ep-a", target_value="ep-a", workspace="team-a"
+    )
+    ep_team_b = _make_endpoint_budget_policy(
+        budget_policy_id="bp-ep-b", target_value="ep-b", workspace="team-b"
+    )
+    tracker.refresh_policies([ep_team_a, ep_team_b])
+
+    with (
+        app.test_client() as c,
+        mock.patch("mlflow.server.handlers.get_budget_tracker", return_value=tracker),
+        mock.patch("mlflow.server.handlers.maybe_refresh_budget_policies"),
+        WorkspaceContext("team-a"),
+    ):
+        response = c.get("/ajax-api/3.0/mlflow/gateway/budgets/windows")
+
+    assert response.status_code == 200
+    policy_ids = {w["budget_policy_id"] for w in response.json["windows"]}
+    assert policy_ids == {"bp-ep-a"}
+
+
 def test_create_issue_with_all_fields():
     request_message = CreateIssue()
     request_message.experiment_id = "exp-123"
@@ -5792,6 +6251,7 @@ def test_create_issue_with_empty_lists():
 
 def test_invoke_issue_detection_handler_success(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_job = JobEntity(
         job_id="job-123",
@@ -5854,6 +6314,7 @@ def test_invoke_issue_detection_handler_success(monkeypatch):
 
 def test_invoke_issue_detection_handler_with_endpoint(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_job = JobEntity(
         job_id="job-456",
@@ -5909,6 +6370,7 @@ def test_invoke_issue_detection_handler_with_endpoint(monkeypatch):
 
 def test_invoke_issue_detection_handler_missing_required_params(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     request_json = {
         "experiment_id": "exp-123",
@@ -5938,6 +6400,158 @@ def test_invoke_issue_detection_handler_missing_required_params(monkeypatch):
         )
 
 
+def test_invoke_issue_detection_handler_no_api_key_fails_fast(monkeypatch):
+    monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    request_json = {
+        "experiment_id": "exp-123",
+        "trace_ids": ["trace-1"],
+        "categories": ["correctness"],
+        "provider": "openai",
+        "model": "gpt-4o",
+        # No secret_id and no endpoint_name
+    }
+
+    with (
+        mock.patch("mlflow.server.jobs.submit_job") as mock_submit_job,
+        app.test_client() as c,
+    ):
+        resp = c.post(
+            "/ajax-api/3.0/mlflow/issues/invoke",
+            json=request_json,
+        )
+        assert resp.status_code == 400
+        json_response = resp.get_json()
+        assert "No API key available for provider 'openai'" in json_response["message"]
+        assert "OPENAI_API_KEY" in json_response["message"]
+        mock_submit_job.assert_not_called()
+
+
+def test_invoke_issue_detection_handler_uses_server_env_key(monkeypatch):
+    monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "server-env-key")
+
+    mock_job = JobEntity(
+        job_id="job-456",
+        creation_time=1234567890000,
+        job_name="invoke_issue_detection",
+        params='{"experiment_id": "exp-123"}',
+        timeout=None,
+        status=JobStatus.PENDING,
+        result=None,
+        retry_count=0,
+        last_update_time=1234567890000,
+        status_details=None,
+    )
+    mock_run = mock.MagicMock()
+    mock_run.info.run_id = "run-456"
+
+    request_json = {
+        "experiment_id": "exp-123",
+        "trace_ids": ["trace-1"],
+        "categories": ["correctness"],
+        "provider": "OpenAI",
+        "model": "gpt-4o",
+        # No secret_id: the job inherits the server's environment key
+    }
+
+    with (
+        mock.patch("mlflow.server.jobs.submit_job", return_value=mock_job) as mock_submit_job,
+        mock.patch("mlflow.start_run", return_value=mock_run),
+        mock.patch("mlflow.set_tag"),
+        mock.patch("mlflow.end_run"),
+        app.test_client() as c,
+    ):
+        resp = c.post(
+            "/ajax-api/3.0/mlflow/issues/invoke",
+            json=request_json,
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["job_id"] == "job-456"
+        mock_submit_job.assert_called_once()
+        assert mock_submit_job.call_args.kwargs["extra_envs"] is None
+        assert mock_submit_job.call_args.kwargs["params"]["model"] == "openai:/gpt-4o"
+
+
+def test_invoke_issue_detection_handler_bedrock_uses_server_env_credentials(monkeypatch):
+    monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key")
+    monkeypatch.delenv("AWS_SESSION_TOKEN", raising=False)
+
+    mock_job = JobEntity(
+        job_id="job-bedrock",
+        creation_time=1234567890000,
+        job_name="invoke_issue_detection",
+        params='{"experiment_id": "exp-123"}',
+        timeout=None,
+        status=JobStatus.PENDING,
+        result=None,
+        retry_count=0,
+        last_update_time=1234567890000,
+        status_details=None,
+    )
+    mock_run = mock.MagicMock()
+    mock_run.info.run_id = "run-bedrock"
+
+    request_json = {
+        "experiment_id": "exp-123",
+        "trace_ids": ["trace-1"],
+        "categories": ["correctness"],
+        "provider": "bedrock",
+        "model": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    }
+
+    with (
+        mock.patch("mlflow.server.jobs.submit_job", return_value=mock_job) as mock_submit_job,
+        mock.patch("mlflow.start_run", return_value=mock_run),
+        mock.patch("mlflow.set_tag"),
+        mock.patch("mlflow.end_run"),
+        app.test_client() as c,
+    ):
+        resp = c.post(
+            "/ajax-api/3.0/mlflow/issues/invoke",
+            json=request_json,
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["job_id"] == "job-bedrock"
+        mock_submit_job.assert_called_once()
+        assert mock_submit_job.call_args.kwargs["extra_envs"] is None
+        assert (
+            mock_submit_job.call_args.kwargs["params"]["model"]
+            == "bedrock:/anthropic.claude-3-5-sonnet-20241022-v2:0"
+        )
+
+
+def test_invoke_issue_detection_handler_unknown_provider_fails_fast(monkeypatch):
+    monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
+
+    request_json = {
+        "experiment_id": "exp-123",
+        "trace_ids": ["trace-1"],
+        "categories": ["correctness"],
+        "provider": "unknown",
+        "model": "some-model",
+    }
+
+    with (
+        mock.patch("mlflow.server.jobs.submit_job") as mock_submit_job,
+        app.test_client() as c,
+    ):
+        resp = c.post(
+            "/ajax-api/3.0/mlflow/issues/invoke",
+            json=request_json,
+        )
+        assert resp.status_code == 400
+        assert "Unsupported provider 'unknown'" in resp.get_json()["message"]
+        mock_submit_job.assert_not_called()
+
+
 def _make_genai_evaluate_job(job_id: str = "job-genai-1") -> JobEntity:
     return JobEntity(
         job_id=job_id,
@@ -5955,6 +6569,7 @@ def _make_genai_evaluate_job(job_id: str = "job-genai-1") -> JobEntity:
 
 def test_invoke_genai_evaluate_handler_success(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_job = _make_genai_evaluate_job()
     mock_run = mock.MagicMock()
@@ -6004,6 +6619,7 @@ def test_invoke_genai_evaluate_handler_success(monkeypatch):
 
 def test_invoke_genai_evaluate_handler_rejects_empty_trace_ids(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_client = mock.MagicMock()
 
@@ -6028,6 +6644,7 @@ def test_invoke_genai_evaluate_handler_rejects_empty_trace_ids(monkeypatch):
 
 def test_invoke_genai_evaluate_handler_rejects_empty_serialized_scorers(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_client = mock.MagicMock()
 
@@ -6051,6 +6668,7 @@ def test_invoke_genai_evaluate_handler_rejects_empty_serialized_scorers(monkeypa
 
 def test_invoke_genai_evaluate_handler_missing_required_fields(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     # Each call drops one of the required fields; the schema validator
     # should reject before we ever create a run.
@@ -6078,6 +6696,7 @@ def test_invoke_genai_evaluate_handler_propagates_basic_auth_username(monkeypatc
     path so judge LLM calls are made *as* the user.
     """
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_job = _make_genai_evaluate_job("job-auth")
     mock_run = mock.MagicMock()
@@ -6112,6 +6731,7 @@ def test_invoke_genai_evaluate_handler_marks_run_failed_when_submit_job_raises(m
     worker that would normally do that transition was never enqueued.
     """
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_run = mock.MagicMock()
     mock_run.info.run_id = "run-fail"
@@ -6152,6 +6772,7 @@ def test_invoke_genai_evaluate_handler_marks_run_failed_when_set_tag_raises(monk
     RUNNING because nothing else writes a terminal status from the handler.
     """
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_job = _make_genai_evaluate_job("job-tag-fail")
     mock_run = mock.MagicMock()

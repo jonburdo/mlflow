@@ -12,6 +12,7 @@ import time
 import typing
 
 import anyio
+from anyio import from_thread
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -24,6 +25,7 @@ from mlflow.exceptions import MlflowException
 from mlflow.gateway.constants import MLFLOW_GATEWAY_DURATION_HEADER, MLFLOW_GATEWAY_OVERHEAD_HEADER
 from mlflow.gateway.providers.utils import provider_call_duration_ms
 from mlflow.server import app as flask_app
+from mlflow.server.artifact_router import artifact_router
 from mlflow.server.asgi_utils import get_routed_asgi_path
 from mlflow.server.assistant.api import assistant_router
 from mlflow.server.fastapi_security import init_fastapi_security
@@ -78,6 +80,42 @@ class _EfficientWSGIResponder(WSGIResponder):
                 await anyio.to_thread.run_sync(self.wsgi, environ, self.start_response)
         if self.exc_info is not None:
             raise self.exc_info[0].with_traceback(self.exc_info[1], self.exc_info[2])
+
+    def start_response(
+        self,
+        status: str,
+        response_headers: list[tuple[str, str]],
+        exc_info: typing.Any = None,
+    ) -> None:
+        self.exc_info = exc_info
+        if not self.response_started:  # pragma: no branch
+            self.response_started = True
+            status_code_string, _ = status.split(" ", 1)
+            headers = [
+                (name.strip().encode("ascii").lower(), value.strip().encode("ascii"))
+                for name, value in response_headers
+            ]
+            from_thread.run(
+                self.stream_send.send,
+                {
+                    "type": "http.response.start",
+                    "status": int(status_code_string),
+                    "headers": headers,
+                },
+            )
+
+    def wsgi(
+        self,
+        environ: dict[str, typing.Any],
+        start_response: typing.Callable[..., typing.Any],
+    ) -> None:
+        for chunk in self.app(environ, start_response):
+            from_thread.run(
+                self.stream_send.send,
+                {"type": "http.response.body", "body": chunk, "more_body": True},
+            )
+
+        from_thread.run(self.stream_send.send, {"type": "http.response.body", "body": b""})
 
 
 class _EfficientWSGIMiddleware:
@@ -206,8 +244,8 @@ def create_fastapi_app(flask_app: Flask = flask_app):
         title="MLflow Tracking Server",
         description="MLflow Tracking Server API",
         version=VERSION,
-        # TODO: Enable API documentation when we have native FastAPI endpoints
-        # For now, disable docs since we only have Flask routes via WSGI
+        # Docs/OpenAPI remain disabled intentionally even though several native
+        # FastAPI routers are mounted (otel, jobs, gateway, assistant, artifacts).
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
@@ -234,13 +272,16 @@ def create_fastapi_app(flask_app: Flask = flask_app):
     if MLFLOW_ENABLE_ASSISTANT.get():
         fastapi_app.include_router(assistant_router)
 
+    # Include native artifact upload/download router for ASGI streaming
+    # This provides /api/2.0/mlflow-artifacts/artifacts/* and /ajax-api/2.0/... routes
+    fastapi_app.include_router(artifact_router)
+
     add_mcp_exception_handlers(fastapi_app)
     for route_prefix in get_mcp_server_api_route_prefixes():
         fastapi_app.include_router(mcp_server_router, prefix=route_prefix)
 
-    # Mount the entire Flask application at the root path
-    # This ensures compatibility with existing APIs
-    # NOTE: This must come AFTER include_router to avoid Flask catching all requests
+    # Mount the entire Flask application at the root path.
+    # Must come AFTER include_router so native FastAPI routes take precedence.
     fastapi_app.mount("/", _EfficientWSGIMiddleware(flask_app))
 
     return fastapi_app

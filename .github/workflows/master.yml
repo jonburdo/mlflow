@@ -58,7 +58,7 @@ jobs:
         include:
           - splits: 4
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
           submodules: true
@@ -86,7 +86,8 @@ jobs:
           GROUP: ${{ matrix.group }}
         run: |
           source dev/setup-ssh.sh
-          uv run --no-sync pytest --splits=$SPLITS --group=$GROUP \
+          COMMON_ARGS=(
+            --splits="$SPLITS" --group="$GROUP"
             --quiet --requires-ssh --ignore-flavors \
             --ignore=tests/examples \
             --ignore=tests/evaluate \
@@ -96,6 +97,9 @@ jobs:
             --ignore=tests/docker \
             --ignore=tests/sagemaker \
             tests
+          )
+          uv run --no-sync pytest --serial=exclude -n auto --dist loadscope "${COMMON_ARGS[@]}"
+          uv run --no-sync pytest --serial=only "${COMMON_ARGS[@]}"
 
   database:
     if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false || github.event.pull_request.user.login == 'Copilot' && github.event.pull_request.user.type == 'Bot')
@@ -104,7 +108,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
       - uses: ./.github/actions/untracked

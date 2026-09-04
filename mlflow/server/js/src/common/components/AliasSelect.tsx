@@ -2,7 +2,6 @@ import type { Dispatch } from 'react';
 import { useCallback, useState } from 'react';
 
 import { LegacySelect, useDesignSystemTheme } from '@databricks/design-system';
-import type { TagColors } from '@databricks/design-system';
 
 import { AliasTag } from './AliasTag';
 import { FormattedMessage, useIntl } from 'react-intl';
@@ -18,8 +17,6 @@ export const AliasSelect = ({
   version,
   aliasToVersionMap,
   disabled,
-  pinnedAliases,
-  pinnedAliasColor,
 }: {
   renderKey: any;
   disabled: boolean;
@@ -28,8 +25,6 @@ export const AliasSelect = ({
   draftAliases: string[];
   version: string;
   aliasToVersionMap: Record<string, string>;
-  pinnedAliases?: string[];
-  pinnedAliasColor?: TagColors;
 }) => {
   const intl = useIntl();
   const [dropdownVisible, setDropdownVisible] = useState(false);
@@ -55,16 +50,14 @@ export const AliasSelect = ({
         )
         // After sanitization, filter out invalid aliases
         // so we won't get empty values
-        .filter((alias) => alias.length > 0)
-        // Exclude pinned aliases from the draft set
-        .filter((alias) => !pinnedAliases?.includes(alias));
+        .filter((alias) => alias.length > 0);
 
       // Remove duplicates that might result from varying letter case
       const uniqueAliases = Array.from(new Set(sanitizedAliases));
       setDraftAliases(uniqueAliases);
       setDropdownVisible(false);
     },
-    [setDraftAliases, pinnedAliases],
+    [setDraftAliases],
   );
 
   return (
@@ -89,39 +82,33 @@ export const AliasSelect = ({
       dangerouslySetAntdProps={{
         dropdownMatchSelectWidth: true,
         // eslint-disable-next-line @databricks/no-unstable-nested-components -- go/no-nested-components
-        tagRender: ({ value }) => {
-          const isPinned = pinnedAliases?.includes(value.toString());
-          return (
-            <AliasTag
-              compact
-              css={{ marginTop: 2 }}
-              closable={!isPinned}
-              onClose={isPinned ? undefined : () => removeFromEditedAliases(value.toString())}
-              value={value.toString()}
-              color={isPinned ? pinnedAliasColor || 'turquoise' : undefined}
-            />
-          );
-        },
+        tagRender: ({ value }) => (
+          <AliasTag
+            compact
+            css={{ marginTop: 2 }}
+            closable
+            onClose={() => removeFromEditedAliases(value.toString())}
+            value={value.toString()}
+          />
+        ),
       }}
       onDropdownVisibleChange={setDropdownVisible}
       open={dropdownVisible}
-      value={[...(pinnedAliases ?? []), ...(draftAliases || [])]}
+      value={draftAliases || []}
     >
-      {existingAliases
-        .filter((alias) => !pinnedAliases?.includes(alias))
-        .map((alias) => (
-          <LegacySelect.Option key={alias} value={alias} data-testid="model-alias-option">
-            <div key={alias} css={{ display: 'flex', marginRight: theme.spacing.xs }}>
-              <div css={{ flex: 1 }}>{alias}</div>
-              <div>
-                <FormattedMessage
-                  defaultMessage="This version"
-                  description="Model registry > model version alias select > Indicator for alias of selected version"
-                />
-              </div>
+      {existingAliases.map((alias) => (
+        <LegacySelect.Option key={alias} value={alias} data-testid="model-alias-option">
+          <div key={alias} css={{ display: 'flex', marginRight: theme.spacing.xs }}>
+            <div css={{ flex: 1 }}>{alias}</div>
+            <div>
+              <FormattedMessage
+                defaultMessage="This version"
+                description="Model registry > model version alias select > Indicator for alias of selected version"
+              />
             </div>
-          </LegacySelect.Option>
-        ))}
+          </div>
+        </LegacySelect.Option>
+      ))}
       {Object.entries(aliasToVersionMap)
         .filter(([, otherVersion]) => otherVersion !== version)
         .map(([alias, aliasedVersion]) => (

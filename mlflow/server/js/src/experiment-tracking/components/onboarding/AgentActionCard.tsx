@@ -56,19 +56,17 @@ export const AgentActionCard = ({
   onActiveTabChange?: (tab: string) => void;
 }) => {
   const { theme } = useDesignSystemTheme();
-  const { openPanel, sendMessage, setupComplete, isLocalServer } = useAssistant();
+  const { openPanel, prefillPrompt, canUseAssistant } = useAssistant();
   const defaultTab: TabKey = showAgentSetupTab ? 'agent-setup' : 'copy-prompt';
+  // Typed as string, not TabKey, because extraTabs contribute arbitrary string values to the
+  // tab space (Tabs.Root.onValueChange hands back a plain string).
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
+  // Open the panel and drop the prompt into the chat input for the user to review and send.
+  // The seed lives on the context, so it survives the setup wizard if setup isn't done yet.
   const handleAssistantClick = () => {
     openPanel();
-    // TODO(joshuawong-db follow-up): if setup isn't complete, the prompt is silently dropped.
-    // Once the setup wizard finishes the user has to retype it. Plumb a queueMessage()
-    // through AssistantContext to defer the send until setupComplete flips true, and
-    // fix the stale-sessionId closure inside startChat at the same time.
-    if (setupComplete) {
-      sendMessage(assistantPrompt);
-    }
+    prefillPrompt(assistantPrompt);
   };
 
   return (
@@ -126,8 +124,8 @@ export const AgentActionCard = ({
             />
           </Tabs.Trigger>
           {codeSnippet && <Tabs.Trigger value="code-snippet">{codeSnippet.label}</Tabs.Trigger>}
-          {/* The in-UI assistant only runs against a local MLflow server, so hide it otherwise. */}
-          {isLocalServer && (
+          {/* Show assistant actions only when the assistant is available (local server or server-enabled remote access). */}
+          {canUseAssistant && (
             <Tabs.Trigger value="assistant">
               <span css={{ display: 'inline-flex', alignItems: 'center', gap: theme.spacing.xs }}>
                 <AssistantSparkleIcon isHovered={false} iconSize={14} />
@@ -270,11 +268,11 @@ export const AgentActionCard = ({
           </Tabs.Content>
         )}
 
-        {isLocalServer && (
+        {canUseAssistant && (
           <Tabs.Content value="assistant" css={{ paddingTop: 0 }}>
             <Typography.Text color="secondary" css={{ fontSize: 13, display: 'block', marginBottom: theme.spacing.sm }}>
               <FormattedMessage
-                defaultMessage="Opens the MLflow assistant in this browser and starts the conversation."
+                defaultMessage="Opens the MLflow assistant in the browser with a suggested prompt."
                 description="Description above the MLflow assistant button in the agent action card"
               />
             </Typography.Text>

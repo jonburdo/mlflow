@@ -6,16 +6,20 @@ import userEvent from '@testing-library/user-event';
 import { AgentActionCard } from './AgentActionCard';
 
 const mockOpenPanel = jest.fn();
-const mockSendMessage = jest.fn();
+const mockPrefillPrompt = jest.fn();
 let mockSetupComplete = true;
-let mockIsLocalServer = true;
+let mockCanUseAssistant = true;
 
 jest.mock('../../../assistant', () => ({
   __esModule: true,
   useAssistant: () => ({
     openPanel: mockOpenPanel,
-    sendMessage: mockSendMessage,
+    sendMessage: jest.fn(),
+    prefillPrompt: mockPrefillPrompt,
+    clearPendingPrompt: jest.fn(),
+    reset: jest.fn(),
     setupComplete: mockSetupComplete,
+    pendingPrompt: null,
     isPanelOpen: false,
     sessionId: null,
     messages: [],
@@ -24,10 +28,10 @@ jest.mock('../../../assistant', () => ({
     currentStatus: null,
     activeTools: [],
     isLoadingConfig: false,
-    isLocalServer: mockIsLocalServer,
+    isLocalServer: true,
+    canUseAssistant: mockCanUseAssistant,
     closePanel: jest.fn(),
     regenerateLastMessage: jest.fn(),
-    reset: jest.fn(),
     cancelSession: jest.fn(),
     refreshConfig: jest.fn(),
     completeSetup: jest.fn(),
@@ -52,9 +56,9 @@ const renderCard = (props: Partial<React.ComponentProps<typeof AgentActionCard>>
 
 beforeEach(() => {
   mockOpenPanel.mockClear();
-  mockSendMessage.mockClear();
+  mockPrefillPrompt.mockClear();
   mockSetupComplete = true;
-  mockIsLocalServer = true;
+  mockCanUseAssistant = true;
 });
 
 describe('AgentActionCard', () => {
@@ -71,8 +75,8 @@ describe('AgentActionCard', () => {
     expect(screen.getByTestId('assistant-sparkle-icon')).toBeInTheDocument();
   });
 
-  it('hides the MLflow assistant tab when not on a local server', () => {
-    mockIsLocalServer = false;
+  it('hides the MLflow assistant tab when assistant is not available', () => {
+    mockCanUseAssistant = false;
     renderCard();
     // Trigger (and its icon) gone...
     expect(screen.queryByRole('tab', { name: /MLflow assistant/ })).not.toBeInTheDocument();
@@ -99,7 +103,7 @@ describe('AgentActionCard', () => {
     expect(screen.getByRole('tab', { name: /One-line setup/ })).toBeInTheDocument();
   });
 
-  it('clicking "Open assistant" with setup complete calls openPanel and sendMessage with the assistant prompt', async () => {
+  it('clicking "Open assistant" opens the panel and prefills the chat input with the prompt', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderCard();
 
@@ -107,11 +111,11 @@ describe('AgentActionCard', () => {
     await user.click(screen.getByRole('button', { name: /Open assistant/ }));
 
     expect(mockOpenPanel).toHaveBeenCalledTimes(1);
-    expect(mockSendMessage).toHaveBeenCalledTimes(1);
-    expect(mockSendMessage).toHaveBeenCalledWith('ASSISTANT_PROMPT_BODY');
+    expect(mockPrefillPrompt).toHaveBeenCalledTimes(1);
+    expect(mockPrefillPrompt).toHaveBeenCalledWith('ASSISTANT_PROMPT_BODY');
   });
 
-  it('clicking "Open assistant" with setup NOT complete opens the panel but drops the prompt (known follow-up)', async () => {
+  it('still prefills the prompt when setup is NOT complete (seed waits on the context through setup)', async () => {
     mockSetupComplete = false;
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderCard();
@@ -120,7 +124,7 @@ describe('AgentActionCard', () => {
     await user.click(screen.getByRole('button', { name: /Open assistant/ }));
 
     expect(mockOpenPanel).toHaveBeenCalledTimes(1);
-    expect(mockSendMessage).not.toHaveBeenCalled();
+    expect(mockPrefillPrompt).toHaveBeenCalledWith('ASSISTANT_PROMPT_BODY');
   });
 
   it('renders extraTabs after the built-in tabs and shows their content when selected', async () => {

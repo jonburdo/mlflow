@@ -34,14 +34,12 @@ export const useEditKeyValueTagsModal = <T extends { tags?: KeyValueEntity[] }>(
   allAvailableTags,
   valueRequired = false,
   title,
-  saveButtonLabel,
 }: {
   onSuccess?: () => void;
   saveTagsHandler: (editedEntity: T, existingTags: KeyValueEntity[], newTags: KeyValueEntity[]) => Promise<any>;
   allAvailableTags?: string[];
   valueRequired?: boolean;
   title?: React.ReactNode;
-  saveButtonLabel?: string;
 }) => {
   const editedEntityRef = useRef<T>();
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -177,12 +175,7 @@ export const useEditKeyValueTagsModal = <T extends { tags?: KeyValueEntity[] }>(
             })}
           </Button>
           {showPopoverMessage ? (
-            <UnsavedTagPopoverTrigger
-              formValues={formValues}
-              isLoading={isLoading}
-              onSaveTask={saveTags}
-              saveButtonLabel={saveButtonLabel}
-            />
+            <UnsavedTagPopoverTrigger formValues={formValues} isLoading={isLoading} onSaveTask={saveTags} />
           ) : (
             <Tooltip
               content={
@@ -203,11 +196,10 @@ export const useEditKeyValueTagsModal = <T extends { tags?: KeyValueEntity[] }>(
                 type="primary"
                 onClick={saveTags}
               >
-                {saveButtonLabel ??
-                  intl.formatMessage({
-                    defaultMessage: 'Save tags',
-                    description: 'Key-value tag editor modal > Manage Tag save button',
-                  })}
+                {intl.formatMessage({
+                  defaultMessage: 'Save tags',
+                  description: 'Key-value tag editor modal > Manage Tag save button',
+                })}
               </Button>
             </Tooltip>
           )}
@@ -312,12 +304,10 @@ function UnsavedTagPopoverTrigger({
   isLoading,
   formValues,
   onSaveTask,
-  saveButtonLabel,
 }: {
   isLoading: boolean;
   formValues: any;
   onSaveTask: () => void;
-  saveButtonLabel?: string;
 }) {
   const intl = useIntl();
   const { theme } = useDesignSystemTheme();
@@ -344,11 +334,10 @@ function UnsavedTagPopoverTrigger({
           loading={isLoading}
           type="primary"
         >
-          {saveButtonLabel ??
-            intl.formatMessage({
-              defaultMessage: 'Save tags',
-              description: 'Key-value tag editor modal > Manage Tag save button',
-            })}
+          {intl.formatMessage({
+            defaultMessage: 'Save tags',
+            description: 'Key-value tag editor modal > Manage Tag save button',
+          })}
         </Button>
       </Popover.Trigger>
       <Popover.Content align="end" aria-label={shownText}>

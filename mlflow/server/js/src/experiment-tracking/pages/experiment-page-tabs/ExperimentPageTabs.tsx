@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ParagraphSkeleton, useDesignSystemTheme } from '@databricks/design-system';
 import { PredefinedError } from '@databricks/web-shared/errors';
 import invariant from 'invariant';
@@ -28,9 +28,11 @@ import Routes, { RoutePaths } from '../../routes';
 import { useGetExperimentPageActiveTabByRoute } from '../../components/experiment-page/hooks/useGetExperimentPageActiveTabByRoute';
 import { useNavigateToExperimentPageTab } from '../../components/experiment-page/hooks/useNavigateToExperimentPageTab';
 import { useIsIntegrated } from '@mlflow/mlflow/src/common/utils/embedUtils';
-import { useWorkflowType, WorkflowType } from '@mlflow/mlflow/src/common/contexts/WorkflowTypeContext';
 import { ExperimentPageSideNav, ExperimentPageSideNavSkeleton } from './side-nav/ExperimentPageSideNav';
 import { HeaderVisibilityProvider, useHeaderVisibility } from './ExperimentPageHeaderVisibilityContext';
+import { ExperimentViewSavedViewsButton } from '../../components/experiment-page/components/header/ExperimentViewSavedViewsButton';
+import { SharedViewActionsBridgeProvider } from '../../components/experiment-page/hooks/useSharedViewActionsBridge';
+import type { ExperimentEntity } from '../../types';
 
 const ExperimentPageTabsImpl = () => {
   const { experimentId, tabName } = useParams();
@@ -95,7 +97,6 @@ const ExperimentPageTabsImpl = () => {
   const enableWorkflowBasedNavigation = shouldEnableWorkflowBasedNavigation();
   const isEmbedded = useIsIntegrated();
   const showExperimentPageSideNav = !enableWorkflowBasedNavigation || isEmbedded;
-  const { workflowType } = useWorkflowType();
 
   const {
     inferredExperimentKind,
@@ -122,26 +123,6 @@ const ExperimentPageTabsImpl = () => {
     enabled: matchedExperimentPageWithoutTab && !isExperimentKindInferenceEnabled,
     experimentId,
   });
-
-  // In embedded mode, WorkflowTypeProvider can't access experimentId (it sits above
-  // routes), so its navigate-on-change never fires. Handle it here instead: when
-  // the user toggles the workflow type, navigate to the appropriate default tab.
-  const prevWorkflowTypeRef = useRef(workflowType);
-  useEffect(() => {
-    if (prevWorkflowTypeRef.current === workflowType) return;
-    prevWorkflowTypeRef.current = workflowType;
-
-    if (!isEmbedded) return;
-
-    const targetTab =
-      workflowType === WorkflowType.GENAI
-        ? shouldEnableExperimentOverviewTab() && isFileStore === false
-          ? ExperimentPageTabName.Overview
-          : ExperimentPageTabName.Traces
-        : ExperimentPageTabName.Runs;
-
-    navigate(Routes.getExperimentPageTabRoute(experimentId, targetTab), { replace: true });
-  }, [workflowType, isEmbedded, experimentId, navigate, isFileStore]);
 
   useEffect(() => {
     // If the experiment kind is inferred, we want to navigate to the appropriate tab.
@@ -211,8 +192,21 @@ const ExperimentPageTabsImpl = () => {
     minHeight: 0,
   };
 
+  // Saved-views controls live in the header (the page-level action cluster) rather than the runs
+  // toolbar, since a view is a container over the toolbar's column/filter/sort selectors. The Views
+  // dropdown reads saved-view tags and the active-view URL param only, and the Save modal
+  // reconstructs the current view from its localStorage persistKey — so no live uiState needs to be
+  // plumbed up here. Sharing lives inside the Views dropdown's "Save & share current view…" entry
+  // rather than a separate button. Runs-only for now; traces parity fills the same slot separately.
+  const headerSavedViewsSlot =
+    activeTab === ExperimentPageTabName.Runs && experiment ? (
+      <ExperimentViewSavedViewsButton experiment={experiment as unknown as ExperimentEntity} />
+    ) : undefined;
+
   return (
-    <>
+    // Bridges the runs shared-view Override/Discard actions (published from ExperimentView, rendered
+    // via the outlet below) up to the header Views dropdown, which lives above the outlet.
+    <SharedViewActionsBridgeProvider>
       {!headerHidden && (
         <ExperimentPageHeaderWithDescription
           experiment={experiment}
@@ -220,6 +214,7 @@ const ExperimentPageTabsImpl = () => {
           onNoteUpdated={refetchExperiment}
           error={experimentError}
           inferredExperimentKind={inferredExperimentKind}
+          savedViewsSlot={headerSavedViewsSlot}
           experimentKindSelector={
             !enableWorkflowBasedNavigation ? (
               <ExperimentViewHeaderKindSelector
@@ -249,7 +244,7 @@ const ExperimentPageTabsImpl = () => {
       ) : (
         <div css={contentWrapperCss}>{outletComponent}</div>
       )}
-    </>
+    </SharedViewActionsBridgeProvider>
   );
 };
 
