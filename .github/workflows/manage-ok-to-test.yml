@@ -1,0 +1,70 @@
+name: Manage ok-to-test Approval
+
+on:
+  # Manages ok-to-test approval across PR updates. For approved external PRs to
+  # RHDS repositories, it triggers trusted base-image cache publication. This
+  # privileged workflow never checks out or executes PR code.
+  pull_request_target:
+    types: [opened, labeled, synchronize]
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  manage-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Manage ok-to-test and request RHDS cache publication
+        env:
+          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          should_publish=false
+          case "$EVENT_ACTION" in
+            opened|synchronize)
+              case "$AUTHOR_ASSOCIATION" in
+                OWNER|MEMBER|COLLABORATOR)
+                  gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/labels" \
+                    -X POST -f 'labels[]=ok-to-test'
+                  should_publish=true
+                  ;;
+                *)
+                  gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/labels/ok-to-test" \
+                    -X DELETE 2>/dev/null || true
+                  ;;
+              esac
+              ;;
+            labeled) [[ "$EVENT_LABEL" == "ok-to-test" ]] && should_publish=true ;;
+          esac
+          if [[ "$should_publish" != "true" ]]; then
+            echo "Cache publication is not authorized for this event."
+            exit 0
+          fi
+          if [[ "$REPOSITORY_OWNER" != "red-hat-data-services" ||
+            "$HEAD_REPOSITORY" == "$REPOSITORY" ]]; then
+            echo "ok-to-test approval is managed; cache publication applies only to external RHDS PRs."
+            exit 0
+          fi
+          gh workflow run publish-base-image-cache.yml \
+            --repo "$REPOSITORY" \
+            --ref "$DEFAULT_BRANCH" \
+            -f pr_number="$PR_NUMBER" \
+            -f head_repository="$HEAD_REPOSITORY" \
+            -f head_sha="$HEAD_SHA"
