@@ -38,7 +38,7 @@ env:
   MLFLOW_TESTS_RUNTIME_IMAGE: localhost/mlflow-tests:ci
   OPERATOR_RUNTIME_ARTIFACT: mlflow-operator-image
   OPERATOR_RUNTIME_IMAGE: localhost/mlflow-operator:ci
-  IS_RHDS_REPOSITORY: ${{ github.repository_owner == 'red-hat-data-services' }}
+  IS_RHDS_REPOSITORY: ${{ github.repository_owner == 'jonburdo' }}
   IS_CROSS_REPOSITORY_PR: >-
     ${{ github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name != github.repository }}

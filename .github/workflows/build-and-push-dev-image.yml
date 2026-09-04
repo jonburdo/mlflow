@@ -62,7 +62,7 @@ jobs:
           REPO: ${{ github.repository }}
         shell: bash
         run: |
-          if [[ "$REPO" == red-hat-data-services/* ]]; then
+          if [[ "$REPO" == jonburdo/* ]]; then
             PREFIX="rhoai-dev"
           else
             PREFIX="odh-dev"

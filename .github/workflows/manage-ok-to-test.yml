@@ -57,7 +57,7 @@ jobs:
             echo "Cache publication is not authorized for this event."
             exit 0
           fi
-          if [[ "$REPOSITORY_OWNER" != "red-hat-data-services" ||
+          if [[ "$REPOSITORY_OWNER" != "jonburdo" ||
             "$HEAD_REPOSITORY" == "$REPOSITORY" ]]; then
             echo "ok-to-test approval is managed; cache publication applies only to external RHDS PRs."
             exit 0
