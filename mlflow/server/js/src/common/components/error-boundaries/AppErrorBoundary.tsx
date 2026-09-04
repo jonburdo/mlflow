@@ -10,6 +10,7 @@ import './AppErrorBoundary.css';
 import defaultErrorImg from '../../static/default-error.svg';
 import Utils from '../../utils/Utils';
 import { withNotifications } from '@databricks/design-system';
+import { handleChunkLoadError } from '../../utils/fetchWithSessionExpiry';
 
 type Props = {
   service?: string;
@@ -32,6 +33,7 @@ class AppErrorBoundary extends Component<React.PropsWithChildren<Props>, State> 
   }
 
   componentDidCatch(error: any, errorInfo: any) {
+    void handleChunkLoadError(error);
     this.setState({ hasError: true });
   }
 
