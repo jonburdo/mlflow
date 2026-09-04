@@ -12,6 +12,7 @@ import time
 import typing
 
 import anyio
+from anyio import from_thread
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -79,6 +80,42 @@ class _EfficientWSGIResponder(WSGIResponder):
                 await anyio.to_thread.run_sync(self.wsgi, environ, self.start_response)
         if self.exc_info is not None:
             raise self.exc_info[0].with_traceback(self.exc_info[1], self.exc_info[2])
+
+    def start_response(
+        self,
+        status: str,
+        response_headers: list[tuple[str, str]],
+        exc_info: typing.Any = None,
+    ) -> None:
+        self.exc_info = exc_info
+        if not self.response_started:  # pragma: no branch
+            self.response_started = True
+            status_code_string, _ = status.split(" ", 1)
+            headers = [
+                (name.strip().encode("ascii").lower(), value.strip().encode("ascii"))
+                for name, value in response_headers
+            ]
+            from_thread.run(
+                self.stream_send.send,
+                {
+                    "type": "http.response.start",
+                    "status": int(status_code_string),
+                    "headers": headers,
+                },
+            )
+
+    def wsgi(
+        self,
+        environ: dict[str, typing.Any],
+        start_response: typing.Callable[..., typing.Any],
+    ) -> None:
+        for chunk in self.app(environ, start_response):
+            from_thread.run(
+                self.stream_send.send,
+                {"type": "http.response.body", "body": chunk, "more_body": True},
+            )
+
+        from_thread.run(self.stream_send.send, {"type": "http.response.body", "body": b""})
 
 
 class _EfficientWSGIMiddleware:

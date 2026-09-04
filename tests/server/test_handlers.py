@@ -161,7 +161,6 @@ from mlflow.server.handlers import (
     _create_experiment,
     _create_issue,
     _create_model_version,
-    _create_presigned_download_url,
     _create_presigned_upload_url,
     _create_prompt_optimization_job,
     _create_registered_model,
@@ -1683,391 +1682,6 @@ def test_create_presigned_upload_url_blocked_in_artifacts_only_mode(monkeypatch)
 
     assert response.status_code == 503
     assert "artifacts-only" in response.get_data(as_text=True).lower()
-
-
-# --- Presigned download URL handler tests ---
-
-
-def test_create_presigned_download_url_success():
-    from mlflow.store.artifact.artifact_repo import MultipartDownloadMixin
-
-    class MockPresignedDownloadRepo(MultipartDownloadMixin):
-        def get_download_presigned_url(self, artifact_path, expiration=300):
-            return PresignedDownloadUrlResponse(
-                url="https://s3.amazonaws.com/bucket/artifacts/model.pkl?X-Amz-Signature=abc",
-                headers={},
-                file_size=1024,
-            )
-
-    mock_run = mock.MagicMock()
-    mock_run.info.artifact_uri = "s3://bucket/0/abc123/artifacts"
-
-    from mlflow.protos.service_pb2 import CreatePresignedDownloadUrl
-
-    request_proto = CreatePresignedDownloadUrl()
-    request_proto.run_id = "abc123"
-    request_proto.path = "model.pkl"
-
-    with (
-        app.test_request_context(method="POST", content_type="application/json"),
-        mock.patch(
-            "mlflow.server.handlers._get_request_message",
-            return_value=request_proto,
-        ),
-        mock.patch(
-            "mlflow.server.handlers._get_tracking_store",
-        ) as mock_store,
-        mock.patch(
-            "mlflow.server.handlers._get_artifact_repo",
-            return_value=MockPresignedDownloadRepo(),
-        ),
-    ):
-        mock_store.return_value.get_run.return_value = mock_run
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 200
-    data = json.loads(response.get_data())
-    assert "presigned_url" in data
-    assert "X-Amz-Signature" in data["presigned_url"]
-    # An empty proto map is omitted from the JSON body, so absent == no headers.
-    assert data.get("headers", {}) == {}
-    # file_size is an int64 proto field, serialized as a JSON number (not a string).
-    assert data["file_size"] == 1024
-
-
-def test_create_presigned_download_url_success_without_file_size():
-    from mlflow.store.artifact.artifact_repo import MultipartDownloadMixin
-
-    class MockPresignedDownloadRepo(MultipartDownloadMixin):
-        def get_download_presigned_url(self, artifact_path, expiration=300):
-            return PresignedDownloadUrlResponse(
-                url="https://s3.amazonaws.com/bucket/artifacts/model.pkl?X-Amz-Signature=abc",
-                headers={},
-                file_size=None,
-            )
-
-    mock_run = mock.MagicMock()
-    mock_run.info.artifact_uri = "s3://bucket/0/abc123/artifacts"
-
-    from mlflow.protos.service_pb2 import CreatePresignedDownloadUrl
-
-    request_proto = CreatePresignedDownloadUrl()
-    request_proto.run_id = "abc123"
-    request_proto.path = "model.pkl"
-
-    with (
-        app.test_request_context(method="POST", content_type="application/json"),
-        mock.patch(
-            "mlflow.server.handlers._get_request_message",
-            return_value=request_proto,
-        ),
-        mock.patch(
-            "mlflow.server.handlers._get_tracking_store",
-        ) as mock_store,
-        mock.patch(
-            "mlflow.server.handlers._get_artifact_repo",
-            return_value=MockPresignedDownloadRepo(),
-        ),
-    ):
-        mock_store.return_value.get_run.return_value = mock_run
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 200
-    data = json.loads(response.get_data())
-    assert "presigned_url" in data
-    assert "file_size" not in data
-
-
-def test_create_presigned_download_url_unsupported_repo():
-    mock_run = mock.MagicMock()
-    mock_run.info.artifact_uri = "file:///tmp/artifacts"
-
-    from mlflow.protos.service_pb2 import CreatePresignedDownloadUrl
-
-    request_proto = CreatePresignedDownloadUrl()
-    request_proto.run_id = "abc123"
-    request_proto.path = "model.pkl"
-
-    with (
-        app.test_request_context(method="POST", content_type="application/json"),
-        mock.patch(
-            "mlflow.server.handlers._get_request_message",
-            return_value=request_proto,
-        ),
-        mock.patch(
-            "mlflow.server.handlers._get_tracking_store",
-        ) as mock_store,
-        mock.patch(
-            "mlflow.server.handlers._get_artifact_repo",
-            return_value=LocalArtifactRepository("/tmp/artifacts"),
-        ),
-    ):
-        mock_store.return_value.get_run.return_value = mock_run
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 501
-    json_response = json.loads(response.get_data())
-    assert json_response["error_code"] == ErrorCode.Name(NOT_IMPLEMENTED)
-    assert "presigned download" in json_response["message"].lower()
-
-
-@pytest.mark.parametrize(
-    "artifact_uri",
-    [
-        "mlflow-artifacts:/0/abc123/artifacts",
-        "http://mlflow-server:5000/api/2.0/mlflow-artifacts/artifacts",
-        "https://mlflow-server/api/2.0/mlflow-artifacts/artifacts",
-    ],
-)
-def test_create_presigned_download_url_rejects_proxy_artifact_uri(artifact_uri):
-    mock_run = mock.MagicMock()
-    mock_run.info.artifact_uri = artifact_uri
-
-    from mlflow.protos.service_pb2 import CreatePresignedDownloadUrl
-
-    request_proto = CreatePresignedDownloadUrl()
-    request_proto.run_id = "abc123"
-    request_proto.path = "model.pkl"
-
-    with (
-        app.test_request_context(method="POST", content_type="application/json"),
-        mock.patch(
-            "mlflow.server.handlers._get_request_message",
-            return_value=request_proto,
-        ),
-        mock.patch(
-            "mlflow.server.handlers._get_tracking_store",
-        ) as mock_store,
-    ):
-        mock_store.return_value.get_run.return_value = mock_run
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 400
-    json_response = json.loads(response.get_data())
-    assert json_response["error_code"] == ErrorCode.Name(INVALID_PARAMETER_VALUE)
-    assert "proxied" in json_response["message"].lower()
-
-
-def test_create_presigned_download_url_invalid_run_id():
-    from mlflow.protos.service_pb2 import CreatePresignedDownloadUrl
-
-    request_proto = CreatePresignedDownloadUrl()
-    request_proto.run_id = "nonexistent_run"
-    request_proto.path = "model.pkl"
-
-    with (
-        app.test_request_context(method="POST", content_type="application/json"),
-        mock.patch(
-            "mlflow.server.handlers._get_request_message",
-            return_value=request_proto,
-        ),
-        mock.patch(
-            "mlflow.server.handlers._get_tracking_store",
-        ) as mock_store,
-    ):
-        mock_store.return_value.get_run.side_effect = MlflowException(
-            "Run 'nonexistent_run' not found",
-            error_code=RESOURCE_DOES_NOT_EXIST,
-        )
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 404
-    json_response = json.loads(response.get_data())
-    assert json_response["error_code"] == ErrorCode.Name(RESOURCE_DOES_NOT_EXIST)
-
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        "../../../etc/passwd",
-        "path/../to/file",
-        "/etc/passwd",
-        "/etc/passwd%00.jpg",
-        "%2E%2E%2F%2E%2E%2Fpath",
-    ],
-)
-def test_create_presigned_download_url_rejects_path_traversal(path):
-    from mlflow.protos.service_pb2 import CreatePresignedDownloadUrl
-
-    request_proto = CreatePresignedDownloadUrl()
-    request_proto.run_id = "abc123"
-    request_proto.path = path
-
-    with (
-        app.test_request_context(method="POST", content_type="application/json"),
-        mock.patch(
-            "mlflow.server.handlers._get_request_message",
-            return_value=request_proto,
-        ),
-    ):
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 400
-    json_response = json.loads(response.get_data())
-    assert json_response["error_code"] == ErrorCode.Name(INVALID_PARAMETER_VALUE)
-
-
-def test_create_presigned_download_url_with_custom_expiration():
-    from mlflow.store.artifact.artifact_repo import MultipartDownloadMixin
-
-    captured_expiration = {}
-
-    class MockPresignedDownloadRepo(MultipartDownloadMixin):
-        def get_download_presigned_url(self, artifact_path, expiration=300):
-            captured_expiration["value"] = expiration
-            return PresignedDownloadUrlResponse(
-                url="https://example.com/presigned",
-                headers={},
-                file_size=None,
-            )
-
-    mock_run = mock.MagicMock()
-    mock_run.info.artifact_uri = "s3://bucket/0/abc123/artifacts"
-
-    from mlflow.protos.service_pb2 import CreatePresignedDownloadUrl
-
-    request_proto = CreatePresignedDownloadUrl()
-    request_proto.run_id = "abc123"
-    request_proto.path = "model.pkl"
-    request_proto.expiration = 60
-
-    with (
-        app.test_request_context(method="POST", content_type="application/json"),
-        mock.patch(
-            "mlflow.server.handlers._get_request_message",
-            return_value=request_proto,
-        ),
-        mock.patch(
-            "mlflow.server.handlers._get_tracking_store",
-        ) as mock_store,
-        mock.patch(
-            "mlflow.server.handlers._get_artifact_repo",
-            return_value=MockPresignedDownloadRepo(),
-        ),
-    ):
-        mock_store.return_value.get_run.return_value = mock_run
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 200
-    assert captured_expiration["value"] == 60
-
-
-def test_create_presigned_download_url_default_expiration(monkeypatch):
-    from mlflow.store.artifact.artifact_repo import MultipartDownloadMixin
-
-    captured_expiration = {}
-
-    class MockPresignedDownloadRepo(MultipartDownloadMixin):
-        def get_download_presigned_url(self, artifact_path, expiration=300):
-            captured_expiration["value"] = expiration
-            return PresignedDownloadUrlResponse(
-                url="https://example.com/presigned",
-                headers={},
-                file_size=None,
-            )
-
-    mock_run = mock.MagicMock()
-    mock_run.info.artifact_uri = "s3://bucket/0/abc123/artifacts"
-
-    from mlflow.protos.service_pb2 import CreatePresignedDownloadUrl
-
-    # Don't set expiration - should default to MLFLOW_PRESIGNED_DOWNLOAD_URL_TTL_SECONDS (300).
-    request_proto = CreatePresignedDownloadUrl()
-    request_proto.run_id = "abc123"
-    request_proto.path = "model.pkl"
-
-    with (
-        app.test_request_context(method="POST", content_type="application/json"),
-        mock.patch(
-            "mlflow.server.handlers._get_request_message",
-            return_value=request_proto,
-        ),
-        mock.patch(
-            "mlflow.server.handlers._get_tracking_store",
-        ) as mock_store,
-        mock.patch(
-            "mlflow.server.handlers._get_artifact_repo",
-            return_value=MockPresignedDownloadRepo(),
-        ),
-    ):
-        mock_store.return_value.get_run.return_value = mock_run
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 200
-    assert captured_expiration["value"] == 300
-
-    # The default is read from the env var, so overriding it flows through to the repo.
-    captured_expiration.clear()
-    monkeypatch.setenv("MLFLOW_PRESIGNED_DOWNLOAD_URL_TTL_SECONDS", "123")
-    with (
-        app.test_request_context(method="POST", content_type="application/json"),
-        mock.patch(
-            "mlflow.server.handlers._get_request_message",
-            return_value=request_proto,
-        ),
-        mock.patch(
-            "mlflow.server.handlers._get_tracking_store",
-        ) as mock_store,
-        mock.patch(
-            "mlflow.server.handlers._get_artifact_repo",
-            return_value=MockPresignedDownloadRepo(),
-        ),
-    ):
-        mock_store.return_value.get_run.return_value = mock_run
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 200
-    assert captured_expiration["value"] == 123
-
-
-def test_create_presigned_download_url_blocked_in_artifacts_only_mode(monkeypatch):
-    from mlflow.server import ARTIFACTS_ONLY_ENV_VAR
-
-    monkeypatch.setenv(ARTIFACTS_ONLY_ENV_VAR, "true")
-
-    with app.test_request_context(method="POST", content_type="application/json"):
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 503
-    assert "artifacts-only" in response.get_data(as_text=True).lower()
-
-
-@pytest.mark.parametrize("expiration", [-5, 0, 604801])
-def test_create_presigned_download_url_rejects_out_of_range_expiration(expiration):
-    # Cloud providers cap signed-URL lifetimes at 7 days (604800s) and reject
-    # out-of-range values only when the URL is used; the handler rejects them up front
-    # so a dead-on-arrival URL is never minted. Uses real request parsing (no
-    # _get_request_message mock) to exercise the full request path.
-    with app.test_request_context(
-        method="POST",
-        content_type="application/json",
-        data=json.dumps({"run_id": "abc123", "path": "model.pkl", "expiration": expiration}),
-    ):
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 400
-    json_response = json.loads(response.get_data())
-    assert json_response["error_code"] == ErrorCode.Name(INVALID_PARAMETER_VALUE)
-    assert "expiration must be between 1 and 604800 seconds" in json_response["message"]
-
-
-def test_create_presigned_download_url_rejects_out_of_range_default_expiration(monkeypatch):
-    # The bound applies to the resolved value, so a misconfigured
-    # MLFLOW_PRESIGNED_DOWNLOAD_URL_TTL_SECONDS is rejected too — not just an
-    # out-of-range value sent by the client.
-    monkeypatch.setenv("MLFLOW_PRESIGNED_DOWNLOAD_URL_TTL_SECONDS", "999999999")
-
-    with app.test_request_context(
-        method="POST",
-        content_type="application/json",
-        data=json.dumps({"run_id": "abc123", "path": "model.pkl"}),
-    ):
-        response = _create_presigned_download_url()
-
-    assert response.status_code == 400
-    json_response = json.loads(response.get_data())
-    assert json_response["error_code"] == ErrorCode.Name(INVALID_PARAMETER_VALUE)
-    assert "expiration must be between 1 and 604800 seconds" in json_response["message"]
 
 
 @pytest.mark.parametrize(
@@ -4218,7 +3832,8 @@ def test_query_trace_metrics_handler_empty_result(mock_get_request_message, mock
     assert response_data == {}
 
 
-def test_invoke_scorer_missing_experiment_id():
+def test_invoke_scorer_missing_experiment_id(monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     with app.test_client() as c:
         response = c.post(
             "/ajax-api/3.0/mlflow/scorer/invoke",
@@ -4229,7 +3844,8 @@ def test_invoke_scorer_missing_experiment_id():
         assert "experiment_id" in data["message"]
 
 
-def test_invoke_scorer_missing_serialized_scorer():
+def test_invoke_scorer_missing_serialized_scorer(monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     with app.test_client() as c:
         response = c.post(
             "/ajax-api/3.0/mlflow/scorer/invoke",
@@ -4240,7 +3856,8 @@ def test_invoke_scorer_missing_serialized_scorer():
         assert "serialized_scorer" in data["message"]
 
 
-def test_invoke_scorer_missing_trace_ids():
+def test_invoke_scorer_missing_trace_ids(monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     with app.test_client() as c:
         response = c.post(
             "/ajax-api/3.0/mlflow/scorer/invoke",
@@ -4251,7 +3868,8 @@ def test_invoke_scorer_missing_trace_ids():
         assert "Please select at least one trace to evaluate" in data["message"]
 
 
-def test_invoke_scorer_submits_jobs(mock_tracking_store):
+def test_invoke_scorer_submits_jobs(mock_tracking_store, monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     serialized_scorer = json.dumps({
         "name": "test_judge",
         "aggregations": [],
@@ -4299,7 +3917,8 @@ def test_invoke_scorer_submits_jobs(mock_tracking_store):
         mock_submit.assert_called_once()
 
 
-def test_invoke_scorer_rejects_decorator_scorer():
+def test_invoke_scorer_rejects_decorator_scorer(monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     from mlflow.genai.scorers.scorer_utils import DECORATOR_SCORER_REGISTRATION_NOT_SUPPORTED_ERROR
 
     serialized_scorer = json.dumps({
@@ -4324,7 +3943,8 @@ def test_invoke_scorer_rejects_decorator_scorer():
         mock_submit.assert_not_called()
 
 
-def test_invoke_scorer_rejects_invalid_json():
+def test_invoke_scorer_rejects_invalid_json(monkeypatch):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     with app.test_client() as c:
         response = c.post(
             "/ajax-api/3.0/mlflow/scorer/invoke",
@@ -4336,6 +3956,23 @@ def test_invoke_scorer_rejects_invalid_json():
         )
     assert response.status_code == 400
     assert "serialized_scorer must be valid JSON" in response.get_json()["message"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/ajax-api/3.0/mlflow/issues/invoke",
+        "/ajax-api/3.0/mlflow/genai/evaluate/invoke",
+        "/ajax-api/3.0/mlflow/scorer/invoke",
+    ],
+)
+def test_job_invocation_endpoints_are_disabled_without_gateway(monkeypatch, path):
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "false")
+
+    with app.test_client() as c:
+        response = c.post(path, json={})
+
+    assert response.status_code == 501
 
 
 def test_get_ui_telemetry_handler(
@@ -5985,36 +5622,6 @@ def _make_endpoint_budget_policy(
     )
 
 
-@pytest.mark.parametrize(
-    ("target_scope", "target_value"),
-    [
-        (BudgetTargetScope.ENDPOINT, "ep-1"),
-        (BudgetTargetScope.GLOBAL, None),
-        (BudgetTargetScope.WORKSPACE, None),
-    ],
-)
-def test_validate_budget_target_scope_valid(target_scope, target_value):
-    from mlflow.server.handlers import _validate_budget_target_scope
-
-    # Should not raise.
-    _validate_budget_target_scope(target_scope, target_value)
-
-
-@pytest.mark.parametrize(
-    ("target_scope", "target_value", "match"),
-    [
-        (BudgetTargetScope.ENDPOINT, None, "target_value is required"),
-        (BudgetTargetScope.GLOBAL, "ep-1", "target_value can only be set"),
-        (BudgetTargetScope.WORKSPACE, "ep-1", "target_value can only be set"),
-    ],
-)
-def test_validate_budget_target_scope_invalid(target_scope, target_value, match):
-    from mlflow.server.handlers import _validate_budget_target_scope
-
-    with pytest.raises(MlflowException, match=match):
-        _validate_budget_target_scope(target_scope, target_value)
-
-
 def test_create_budget_policy_endpoint_scope():
     created = _make_endpoint_budget_policy(target_value="ep-1")
     store = mock.MagicMock()
@@ -6644,6 +6251,7 @@ def test_create_issue_with_empty_lists():
 
 def test_invoke_issue_detection_handler_success(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_job = JobEntity(
         job_id="job-123",
@@ -6706,6 +6314,7 @@ def test_invoke_issue_detection_handler_success(monkeypatch):
 
 def test_invoke_issue_detection_handler_with_endpoint(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_job = JobEntity(
         job_id="job-456",
@@ -6761,6 +6370,7 @@ def test_invoke_issue_detection_handler_with_endpoint(monkeypatch):
 
 def test_invoke_issue_detection_handler_missing_required_params(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     request_json = {
         "experiment_id": "exp-123",
@@ -6792,6 +6402,7 @@ def test_invoke_issue_detection_handler_missing_required_params(monkeypatch):
 
 def test_invoke_issue_detection_handler_no_api_key_fails_fast(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     request_json = {
@@ -6820,6 +6431,7 @@ def test_invoke_issue_detection_handler_no_api_key_fails_fast(monkeypatch):
 
 def test_invoke_issue_detection_handler_uses_server_env_key(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     monkeypatch.setenv("OPENAI_API_KEY", "server-env-key")
 
     mock_job = JobEntity(
@@ -6866,6 +6478,7 @@ def test_invoke_issue_detection_handler_uses_server_env_key(monkeypatch):
 
 def test_invoke_issue_detection_handler_bedrock_uses_server_env_credentials(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-access-key")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key")
     monkeypatch.delenv("AWS_SESSION_TOKEN", raising=False)
@@ -6916,6 +6529,7 @@ def test_invoke_issue_detection_handler_bedrock_uses_server_env_credentials(monk
 
 def test_invoke_issue_detection_handler_unknown_provider_fails_fast(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     request_json = {
         "experiment_id": "exp-123",
@@ -6955,6 +6569,7 @@ def _make_genai_evaluate_job(job_id: str = "job-genai-1") -> JobEntity:
 
 def test_invoke_genai_evaluate_handler_success(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_job = _make_genai_evaluate_job()
     mock_run = mock.MagicMock()
@@ -7004,6 +6619,7 @@ def test_invoke_genai_evaluate_handler_success(monkeypatch):
 
 def test_invoke_genai_evaluate_handler_rejects_empty_trace_ids(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_client = mock.MagicMock()
 
@@ -7028,6 +6644,7 @@ def test_invoke_genai_evaluate_handler_rejects_empty_trace_ids(monkeypatch):
 
 def test_invoke_genai_evaluate_handler_rejects_empty_serialized_scorers(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_client = mock.MagicMock()
 
@@ -7051,6 +6668,7 @@ def test_invoke_genai_evaluate_handler_rejects_empty_serialized_scorers(monkeypa
 
 def test_invoke_genai_evaluate_handler_missing_required_fields(monkeypatch):
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     # Each call drops one of the required fields; the schema validator
     # should reject before we ever create a run.
@@ -7078,6 +6696,7 @@ def test_invoke_genai_evaluate_handler_propagates_basic_auth_username(monkeypatc
     path so judge LLM calls are made *as* the user.
     """
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_job = _make_genai_evaluate_job("job-auth")
     mock_run = mock.MagicMock()
@@ -7112,6 +6731,7 @@ def test_invoke_genai_evaluate_handler_marks_run_failed_when_submit_job_raises(m
     worker that would normally do that transition was never enqueued.
     """
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_run = mock.MagicMock()
     mock_run.info.run_id = "run-fail"
@@ -7152,6 +6772,7 @@ def test_invoke_genai_evaluate_handler_marks_run_failed_when_set_tag_raises(monk
     RUNNING because nothing else writes a terminal status from the handler.
     """
     monkeypatch.setenv("MLFLOW_SERVER_ENABLE_JOB_EXECUTION", "true")
+    monkeypatch.setenv("MLFLOW_ENABLE_AI_GATEWAY", "true")
 
     mock_job = _make_genai_evaluate_job("job-tag-fail")
     mock_run = mock.MagicMock()

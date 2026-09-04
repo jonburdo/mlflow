@@ -23,13 +23,10 @@ import {
 import Routes, { RoutePaths } from '../../../../routes';
 import { ExperimentViewCopyTitle } from './ExperimentViewCopyTitle';
 import type { ExperimentEntity } from '../../../../types';
-import type { ExperimentPageSearchFacetsState } from '../../models/ExperimentPageSearchFacetsState';
-import type { ExperimentPageUIState } from '../../models/ExperimentPageUIState';
 import { ExperimentViewArtifactLocation } from '../ExperimentViewArtifactLocation';
 import { ExperimentViewCopyExperimentId } from './ExperimentViewCopyExperimentId';
 import { ExperimentViewCopyArtifactLocation } from './ExperimentViewCopyArtifactLocation';
 import { InfoPopover } from '@databricks/design-system';
-import { ExperimentViewHeaderShareButton } from './ExperimentViewHeaderShareButton';
 import { useExperimentKind, isGenAIExperimentKind } from '../../../../utils/ExperimentKindUtils';
 import { ExperimentViewManagementMenu } from './ExperimentViewManagementMenu';
 import { useIsIntegrated } from '@mlflow/mlflow/src/common/utils/embedUtils';
@@ -63,17 +60,15 @@ export const ExperimentViewHeader = React.memo(
   ({
     experiment,
     inferredExperimentKind,
-    searchFacetsState,
-    uiState,
     setEditing,
     experimentKindSelector,
+    savedViewsSlot,
   }: {
     experiment: ExperimentEntity;
     inferredExperimentKind?: ExperimentKind;
-    searchFacetsState?: ExperimentPageSearchFacetsState;
-    uiState?: ExperimentPageUIState;
     setEditing: (editing: boolean) => void;
     experimentKindSelector?: React.ReactNode;
+    savedViewsSlot?: React.ReactNode;
   }) => {
     const { theme } = useDesignSystemTheme();
     const intl = useIntl();
@@ -102,7 +97,6 @@ export const ExperimentViewHeader = React.memo(
         navigate(createMLflowRoutePath('/') + pathSegments.join('/'));
       }
     }, [location.pathname, navigate]);
-    const experimentIds = useMemo(() => (experiment ? [experiment?.experimentId] : []), [experiment]);
     const isEmbedded = useIsIntegrated();
 
     const showDocsLink = false;
@@ -313,14 +307,10 @@ export const ExperimentViewHeader = React.memo(
           >
             {!headerActionsHidden && (
               <>
+                {savedViewsSlot}
                 {!ROUTES_WITHOUT_MANAGEMENT_MENU.some((route) => matchPath(route, location.pathname)) && (
                   <ExperimentViewManagementMenu experiment={experiment} setEditing={setEditing} />
                 )}
-                <ExperimentViewHeaderShareButton
-                  experimentIds={experimentIds}
-                  searchFacetsState={searchFacetsState}
-                  uiState={uiState}
-                />
               </>
             )}
             {showDocsLink && !isEmbedded && (

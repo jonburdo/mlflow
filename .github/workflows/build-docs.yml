@@ -10,7 +10,6 @@ on:
       - dev/build_docs.py
       - .github/workflows/build-docs.yml
       # `build_docs.py` mirrors the docs build steps, so re-verify it when they change
-      - .github/workflows/docs.yml
   workflow_dispatch:
     inputs:
       ref:

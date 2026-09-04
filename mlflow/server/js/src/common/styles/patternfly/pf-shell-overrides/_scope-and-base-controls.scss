@@ -1,4 +1,5 @@
 @use './icons' as icons;
+@use './action-groups' as action-groups;
 
 .pf-shell-container,
 .pf-shell-root.mlflow-federated {
@@ -68,17 +69,22 @@
       .du-bois-light-btn-icon-only
     ):not(.du-bois-light-btn-link):not([type='submit']):not([aria-label='Toggle visibility of rows']):not(
       [aria-label='Remove filter']
-    ):not(.ag-cell *):not(.ag-grid-sticky *),
+    ):not(:has(~ button.du-bois-light-btn-primary, ~ * > button.du-bois-light-btn-primary)):not(.ag-cell *):not(
+      .ag-grid-sticky *
+    ):not(.du-bois-light-modal-footer *):not(.du-bois-dark-modal-footer *),
   button.du-bois-dark-btn:not(.du-bois-dark-btn-primary):not(.du-bois-dark-btn-dangerous):not(
       .du-bois-dark-btn-icon-only
     ):not(.du-bois-dark-btn-link):not([type='submit']):not([aria-label='Toggle visibility of rows']):not(
       [aria-label='Remove filter']
-    ):not(.ag-cell *):not(.ag-grid-sticky *) {
+    ):not(:has(~ button.du-bois-dark-btn-primary, ~ * > button.du-bois-dark-btn-primary)):not(.ag-cell *):not(
+      .ag-grid-sticky *
+    ):not(.du-bois-light-modal-footer *):not(.du-bois-dark-modal-footer *) {
     color: var(--pf-t--global--text--color--brand--default) !important;
     border: none !important; // Remove native border
     box-shadow: inset 0 0 0 var(--pf-t--global--border--width--action--default)
       var(--pf-t--global--border--color--brand--default) !important;
-    span > svg {
+    span > svg,
+    span[role='img'] {
       color: var(--pf-t--global--text--color--brand--default) !important;
     }
     padding-block-start: calc(
@@ -100,7 +106,8 @@
       border-color: transparent !important;
       box-shadow: none !important;
 
-      span > svg {
+      span > svg,
+      span[role='img'] {
         color: var(--pf-t--global--text--color--on-disabled) !important;
       }
 
@@ -146,21 +153,24 @@
 
   button.du-bois-light-btn:not([aria-label='Toggle visibility of rows']):not(.ag-cell *):not(.ag-grid-sticky *):not(
       .du-bois-light-btn-icon-only
-    ),
+    ):not(.du-bois-light-btn-link),
   button.du-bois-dark-btn:not([aria-label='Toggle visibility of rows']):not(.ag-cell *):not(.ag-grid-sticky *):not(
       .du-bois-dark-btn-icon-only
-    ) {
+    ):not(.du-bois-dark-btn-link) {
     padding-block-start: var(--pf-t--global--spacer--xs) !important;
     padding-block-end: var(--pf-t--global--spacer--xs) !important;
     padding-inline-start: var(--pf-t--global--spacer--md) !important;
     padding-inline-end: var(--pf-t--global--spacer--md) !important;
+    min-height: calc(
+      var(--pf-t--global--font--size--body--default) * var(--pf-t--global--font--line-height--body) +
+        var(--pf-t--global--spacer--sm) * 2
+    ) !important;
     border-radius: var(--pf-t--global--border--radius--pill) !important;
     border-start-start-radius: var(--pf-t--global--border--radius--pill) !important;
     border-start-end-radius: var(--pf-t--global--border--radius--pill) !important;
     border-end-start-radius: var(--pf-t--global--border--radius--pill) !important;
     border-end-end-radius: var(--pf-t--global--border--radius--pill) !important;
     height: auto !important;
-    align-self: center !important;
   }
 
   // Prevent buttons from stretching in the prompts detail action bar
@@ -178,17 +188,90 @@
     border-radius: var(--pf-t--global--border--radius--pill) !important;
   }
 
-  button.du-bois-light-btn.du-bois-light-btn-link,
-  button.du-bois-dark-btn.du-bois-dark-btn-link {
-    background-color: transparent !important;
+  button.du-bois-light-btn.du-bois-light-btn-link:not(.du-bois-light-btn-icon-only),
+  button.du-bois-dark-btn.du-bois-dark-btn-link:not(.du-bois-dark-btn-icon-only) {
+    background-color: var(--pf-t--global--background--color--action--plain--default) !important;
+    color: var(--pf-t--global--text--color--brand--default) !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    border-radius: var(--pf-t--global--border--radius--action--plain--default) !important;
+    border-start-start-radius: var(--pf-t--global--border--radius--action--plain--default) !important;
+    border-start-end-radius: var(--pf-t--global--border--radius--action--plain--default) !important;
+    border-end-start-radius: var(--pf-t--global--border--radius--action--plain--default) !important;
+    border-end-end-radius: var(--pf-t--global--border--radius--action--plain--default) !important;
+    padding-inline-start: var(--pf-t--global--spacer--action--horizontal--plain--default) !important;
+    padding-inline-end: var(--pf-t--global--spacer--action--horizontal--plain--default) !important;
+
+    span > svg,
+    span[role='img'] {
+      color: var(--pf-t--global--icon--color--brand--default) !important;
+    }
+
+    &:hover:not(:disabled) {
+      background-color: var(--pf-t--global--background--color--action--plain--hover) !important;
+      color: var(--pf-t--global--text--color--brand--hover) !important;
+
+      span > svg,
+      span[role='img'] {
+        color: var(--pf-t--global--text--color--brand--hover) !important;
+      }
+    }
+
+    &:active:not(:disabled) {
+      background-color: var(--pf-t--global--background--color--action--plain--clicked) !important;
+      color: var(--pf-t--global--text--color--brand--clicked) !important;
+    }
+
+    &:disabled {
+      color: var(--pf-t--global--text--color--on-disabled) !important;
+      background-color: var(--pf-t--global--background--color--disabled--default) !important;
+
+      span > svg,
+      span[role='img'] {
+        color: var(--pf-t--global--icon--color--on-disabled) !important;
+      }
+    }
+
+    &.du-bois-light-btn-dangerous,
+    &.du-bois-dark-btn-dangerous {
+      color: var(--pf-t--global--text--color--status--danger--default) !important;
+      background-color: var(--pf-t--global--background--color--action--plain--default) !important;
+
+      span > svg,
+      span[role='img'] {
+        color: var(--pf-t--global--text--color--status--danger--default) !important;
+      }
+
+      &:hover:not(:disabled) {
+        color: var(--pf-t--global--text--color--status--danger--hover) !important;
+        background-color: var(--pf-t--global--background--color--action--plain--hover) !important;
+
+        span > svg,
+        span[role='img'] {
+          color: var(--pf-t--global--text--color--status--danger--hover) !important;
+        }
+      }
+
+      &:active:not(:disabled) {
+        color: var(--pf-t--global--text--color--status--danger--clicked) !important;
+        background-color: var(--pf-t--global--background--color--action--plain--clicked) !important;
+      }
+    }
   }
 
-  button.du-bois-dark-btn.du-bois-dark-btn-icon-only:enabled:not(.du-bois-dark-btn-sm),
-  button.du-bois-light-btn.du-bois-light-btn-icon-only:enabled:not(.du-bois-light-btn-sm) {
+  button.du-bois-dark-btn.du-bois-dark-btn-icon-only:enabled:not(.du-bois-dark-btn-sm):not(.du-bois-dark-btn-dangerous),
+  button.du-bois-light-btn.du-bois-light-btn-icon-only:enabled:not(.du-bois-light-btn-sm):not(
+      .du-bois-light-btn-dangerous
+    ) {
     background-color: transparent !important;
+    color: var(--pf-t--global--text--color--brand--default) !important;
     padding-block-start: var(--pf-t--global--spacer--sm) !important;
     padding-block-end: var(--pf-t--global--spacer--sm) !important;
     border-radius: var(--pf-t--global--border--radius--small) !important;
+
+    span[role='img'] {
+      color: var(--pf-t--global--text--color--brand--default) !important;
+    }
   }
 
   button.du-bois-dark-btn.du-bois-dark-btn-icon-only:enabled:hover,
@@ -216,9 +299,9 @@
     color: var(--pf-t--global--text--color--brand--default) !important;
   }
 
-  button.du-bois-light-btn-dangerous,
+  button.du-bois-light-btn-dangerous:not(.du-bois-light-btn-icon-only):not(.du-bois-light-btn-link),
   button.du-bois-light-btn-dangerous.du-bois-light-btn-primary,
-  button.du-bois-dark-btn-dangerous,
+  button.du-bois-dark-btn-dangerous:not(.du-bois-dark-btn-icon-only):not(.du-bois-dark-btn-link),
   button.du-bois-dark-btn-dangerous.du-bois-dark-btn-primary {
     background-color: var(--pf-t--global--color--status--danger--default) !important;
     color: var(--pf-t--global--text--color--status--on-danger--default) !important;
@@ -245,6 +328,43 @@
         border-color: transparent !important;
       }
     }
+  }
+
+  /* Normalize page and modal action groups, including tooltip-wrapped primary buttons. */
+  :is(div, form):has(> button.du-bois-light-btn:not(.du-bois-light-btn-primary):not(.du-bois-light-btn-dangerous)):has(
+      > button.du-bois-light-btn-primary,
+      > * > button.du-bois-light-btn-primary
+    ),
+  :is(div, form):has(> button.du-bois-dark-btn:not(.du-bois-dark-btn-primary):not(.du-bois-dark-btn-dangerous)):has(
+      > button.du-bois-dark-btn-primary,
+      > * > button.du-bois-dark-btn-primary
+    ) {
+    @include action-groups.pf-action-group;
+  }
+
+  // Danger icon-only buttons — transparent background, danger-colored icon
+  button.du-bois-light-btn-dangerous.du-bois-light-btn-icon-only:not(.du-bois-light-btn-primary),
+  button.du-bois-dark-btn-dangerous.du-bois-dark-btn-icon-only:not(.du-bois-dark-btn-primary) {
+    background-color: transparent !important;
+    color: var(--pf-t--global--color--status--danger--default) !important;
+    border-color: transparent !important;
+
+    span > svg {
+      color: var(--pf-t--global--color--status--danger--default) !important;
+    }
+
+    &:hover:not(:disabled) {
+      background-color: var(--pf-t--global--background--color--action--plain--hover) !important;
+      color: var(--pf-t--global--color--status--danger--hover) !important;
+
+      span > svg {
+        color: var(--pf-t--global--color--status--danger--hover) !important;
+      }
+    }
+  }
+
+  [data-component-type='toggle_button'] {
+    box-shadow: none !important;
   }
 
   .du-bois-light-alert,
@@ -390,7 +510,7 @@
 
     label.du-bois-light-radio-button-wrapper,
     label.du-bois-dark-radio-button-wrapper {
-      border: var(--pf-t--global--border--width--control--default) solid var(--pf-t--global--border--color--default) !important;
+      border: 0 !important;
       padding-block: var(--pf-t--global--spacer--xs) !important;
       padding-inline: var(--pf-t--global--spacer--md) !important;
       font-size: var(--pf-t--global--font--size--body--default);
@@ -399,9 +519,35 @@
       background-color: transparent !important;
       box-shadow: none !important;
       border-radius: 0;
+      position: relative;
+
+      --_tg-before-bw: var(--pf-t--global--border--width--control--default);
+
+      &::before,
+      &::after {
+        position: absolute;
+        inset: 0 !important;
+        pointer-events: none;
+        content: '' !important;
+        border-style: solid;
+        border-radius: inherit;
+        display: block !important;
+        width: auto !important;
+        height: auto !important;
+        background: none !important;
+        padding: 0 !important;
+        transform: none !important;
+      }
 
       &::before {
-        display: none !important;
+        border-width: var(--_tg-before-bw);
+        border-color: var(--pf-t--global--border--color--control--default);
+      }
+
+      &::after {
+        inset: var(--_tg-before-bw) !important;
+        border-color: transparent;
+        border-width: 0;
       }
 
       span {
@@ -417,12 +563,23 @@
       &:hover:not(.du-bois-light-radio-button-wrapper-disabled):not(.du-bois-dark-radio-button-wrapper-disabled):not(
           .du-bois-light-radio-button-wrapper-checked
         ):not(.du-bois-dark-radio-button-wrapper-checked) {
-        background-color: var(--pf-t--global--background--color--action--plain--hover) !important;
-        border-color: var(--pf-t--global--border--color--default) !important;
+        background-color: var(--pf-t--global--color--brand--subtle--default) !important;
+        color: var(--pf-t--global--text--color--on-brand--subtle--default) !important;
+        z-index: var(--pf-t--global--z-index--xs);
+
+        &::before {
+          border-color: var(--pf-t--global--border--color--brand--subtle--hover);
+        }
+
+        &::after {
+          border-width: var(--pf-t--global--border--width--high-contrast--regular);
+          border-color: var(--pf-t--global--border--color--brand--subtle--hover);
+        }
       }
 
       &:first-of-type {
-        border-radius: var(--pf-t--global--border--radius--tiny) 0 0 var(--pf-t--global--border--radius--tiny);
+        border-radius: var(--pf-t--global--border--radius--control--default) 0 0
+          var(--pf-t--global--border--radius--control--default);
       }
 
       & + label {
@@ -430,15 +587,25 @@
       }
 
       &:last-of-type {
-        border-radius: 0 var(--pf-t--global--border--radius--tiny) var(--pf-t--global--border--radius--tiny) 0;
+        border-radius: 0 var(--pf-t--global--border--radius--control--default)
+          var(--pf-t--global--border--radius--control--default) 0;
       }
 
       &.du-bois-light-radio-button-wrapper-checked,
       &.du-bois-dark-radio-button-wrapper-checked {
-        background-color: var(--pf-t--global--color--brand--default) !important;
-        border-color: var(--pf-t--global--color--brand--default) !important;
-        color: var(--pf-t--global--text--color--on-brand--default) !important;
-        z-index: 100;
+        --_tg-before-bw: var(--pf-t--global--border--width--high-contrast--regular);
+        background-color: var(--pf-t--global--color--brand--subtle--default) !important;
+        color: var(--pf-t--global--text--color--on-brand--subtle--default) !important;
+        z-index: var(--pf-t--global--z-index--xs);
+
+        &::before {
+          border-color: var(--pf-t--global--border--color--brand--subtle--clicked);
+        }
+
+        &::after {
+          border-color: var(--pf-t--global--border--color--brand--subtle--clicked);
+          border-width: var(--pf-t--global--border--width--control--clicked);
+        }
       }
 
       &.du-bois-light-radio-button-wrapper-disabled,

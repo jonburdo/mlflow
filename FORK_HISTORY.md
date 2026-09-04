@@ -23,6 +23,96 @@ These break CI after every rebase. Fix them proactively before pushing.
 
 ---
 
+## Rebase: v3.14.0 → v3.15.2
+
+**Date:** 2026-09-02
+**Upstream tag:** `v3.15.2`
+
+### Dropped commits (already in v3.15.0)
+
+- MCP Registry prototype UI (`885ed9ece`) and its superseded federation export (`7502c8c82`)
+- Upstream MCP Registry import/follow-up commits, artifacts-only workspaces, generated schema alignment, and DNS-rebinding fix
+
+### Retained ODH changes
+
+- Fork scaffolding, Konflux configuration, and ODH workflow policy
+- Federated MCP Registry integration, embedded-mode behavior, PatternFly overrides, and UI refinements
+- Konflux dependency security pins and `mlflow-kubernetes-plugins` `1.6.0`, which provides MLflow 3.15 authorization coverage
+
+### Conflict resolutions and validation
+
+- Removed upstream-only workflows retained by ODH policy; kept the ODH `master.yml` behavior
+- Preserved ODH gateway feature flags and gateway-disable handlers while accepting v3.15 refactors
+- Preserved the downstream MCP federation layer over the upstream MCP Registry implementation
+- TypeScript compilation, CSS override audit, and `tests/server/test_gateway_disable.py` passed
+
+### Post-rebase follow-up
+
+- **Reconciliation and CI fixes:** Reconciled ODH gateway-disable behavior with
+  v3.15.2 handler guards while retaining workspace artifact-path scoping.
+  Formatted the component-ID registry with the pinned Prettier v2 hook, restored
+  the v3.15.2 budget-window filter, updated affected JS tests, and retained the
+  needed Konflux fsevents resolution.
+
+- **Focused JS timeout investigation:** The CopyButton minimal render,
+  StarterCodeCard Python-tab, and PlaygroundTopBar Save-callback tests did not
+  reproduce their CI timeouts (each completed in about two seconds). The MCP
+  Registry display-name overflow test consistently completed successfully only
+  after roughly eight seconds; it now has a local 10-second allowance. No
+  production behavior or global Jest timeout was changed. The S3 multipart
+  presigned-upload operator failure remains owned by mlflow-operator and is
+  intentionally not addressed here.
+
+- **v3.15.2 handler reconciliation:** Restored the upstream presigned-download
+  endpoint, multipart capability advertisement, artifacts-only guards, budget
+  target validation, issue-detection provider validation, scorer JSON
+  validation, and Python CI's two-pass xdist partition. ODH additionally
+  disables the three job-invocation endpoints at the backend when
+  `MLFLOW_ENABLE_AI_GATEWAY` is false; their upstream behavior remains covered
+  with the flag enabled in focused tests.
+
+- **Streaming artifact uploads:** v3.15.2's `_upload_artifact()` uses
+  `StreamUploadMixin.log_artifact_from_stream()` when the artifact repository
+  supports it, falling back to a temporary file otherwise. Keep that upstream
+  branch together with ODH's workspace-path scoping. This is conflict
+  reconciliation against v3.15.2, not a separately carried downstream patch.
+
+- **Whitespace-only CI policy:** Restored the pre-rebase blank line whitespace
+  in `dev/run-dev-server.sh`. The whitespace checker correctly rejects an
+  otherwise unnecessary formatting-only diff; this restoration leaves runtime
+  behavior unchanged and avoids requiring its bypass label.
+
+- **Protobuf cross-test diagnostics:** The Docker-backed MySQL, PostgreSQL, and
+  MSSQL integration test now emits Compose logs before `testcontainers` tears
+  down failed containers. The temporary workflow-level post-failure log step
+  was removed because it runs too late.
+
+- **AnyIO-compatible WSGI adapter:** Fresh Docker integration images resolved
+  AnyIO 4.15, where `anyio.from_thread` is no longer implicitly exposed from
+  the package. The fork's efficient WSGI adapter now explicitly uses the
+  supported submodule API instead of inheriting Starlette's incompatible
+  implementation, restoring server health checks without constraining AnyIO.
+
+- **TLS handling for multipart downloads:** Upstream #24113
+  (`bd94df33e`) made multipart presigned uploads honor `MLFLOW_S3_IGNORE_TLS`.
+  The release still omitted the equivalent multipart-download path, so this is
+  retained as a separate follow-up commit. Remove it when an upstream fix is
+  available.
+
+### Late master commits and history link
+
+- `49fb992a1b` (MCP detail-page action order), `ba31788507` (PF6 toggle styles),
+  and `ed640d9a7` (`OWNERS` approvers) were already in the second parent of the
+  original history-link merge. Their intended final content is incorporated in
+  the three squashed carried commits because an `ours` merge does not retain the
+  second parent's tree.
+- `55ffb4147c` (modal footer and link-button styles plus the edit-modal cancel
+  action) landed after that merge. Its patch is incorporated into the UI
+  reconciliation and the rewritten history link uses `55ffb4147c` as its master
+  parent. It was not separately cherry-picked.
+
+---
+
 ## Rebase: v3.13.0 → v3.14.0
 
 **Date:** 2026-07-09
@@ -31,15 +121,15 @@ These break CI after every rebase. Fix them proactively before pushing.
 
 ### Dropped commits (already in v3.14.0)
 
-| Original hash | Subject | Upstream equivalent |
-| ------------- | ------- | ------------------- |
-| `06cedb957` | drop: Optimize local artifact uploads with atomic rename (#23794) | `20f567a96` |
-| `6497fb3ef` | drop: Cherry-pick upstream test fixes for CI stability | Multiple |
-| `e01db8f08` | drop: Skip copying local artifacts to temp directories for artifact serving | `20f567a96` |
-| `697f12f8a` | drop: Fix HuggingFace revision test broken by datasets >= 4.8.5 | In v3.14.0 |
-| `4707d29bf` | drop: Skip guardrails-ai while package is unavailable on PyPI | `4cdfed1c5` |
-| `55be94684` | backport: Include workspace in webhook delivery envelopes (#22873) | `0ba31551a` |
-| `fae51223a` | drop: Pin langchain-community<0.4.2 in genai CI job (#23697) | `b20ae2163` |
+| Original hash | Subject                                                                     | Upstream equivalent |
+| ------------- | --------------------------------------------------------------------------- | ------------------- |
+| `06cedb957`   | drop: Optimize local artifact uploads with atomic rename (#23794)           | `20f567a96`         |
+| `6497fb3ef`   | drop: Cherry-pick upstream test fixes for CI stability                      | Multiple            |
+| `e01db8f08`   | drop: Skip copying local artifacts to temp directories for artifact serving | `20f567a96`         |
+| `697f12f8a`   | drop: Fix HuggingFace revision test broken by datasets >= 4.8.5             | In v3.14.0          |
+| `4707d29bf`   | drop: Skip guardrails-ai while package is unavailable on PyPI               | `4cdfed1c5`         |
+| `55be94684`   | backport: Include workspace in webhook delivery envelopes (#22873)          | `0ba31551a`         |
+| `fae51223a`   | drop: Pin langchain-community<0.4.2 in genai CI job (#23697)                | `b20ae2163`         |
 
 ### Squashed commits
 
@@ -112,18 +202,15 @@ Dropped as empty by git — `uv.lock` and `pyproject.toml` changes were already 
 - Added top-level `permissions: {}` to 7 ODH workflows (conftest policy)
 - Updated CSS override verified versions
 - Updated rebase skill with step 10b (dropped-file detection)
+- Gated Playground tab and route behind `shouldEnableAIGateway()` — Playground requires the AI Gateway backend, so it should be hidden when `MLFLOW_ENABLE_AI_GATEWAY=false`
+- Passed MLflow version override (`SUPPORTED_MLFLOW_VERSION_OVERRIDE`) to the operator CI build to resolve the chicken-and-egg version mismatch during rebase PRs
 
-### Known upstream test failures (not fixed on upstream master)
+### Upstream test fixes cherry-picked
 
-7 suites fail on v3.14.0 with no fix available on upstream `master`:
-
-- `TracesV3Logs.test.tsx`
-- `PromptsPage.test.tsx`
-- `RunEvaluationButton.test.tsx`
-- `GatewayUsagePage.test.tsx`
-- `ReviewQueueList.test.tsx`
-- `IssueDetectionModal.test.tsx`
-- `TraceCostBreakdownChart.test.tsx`
+| Commit    | Subject                                                         | Upstream PR                                           |
+| --------- | --------------------------------------------------------------- | ----------------------------------------------------- |
+| `8cbf564` | drop: Fix core tracing tests broken by opentelemetry-sdk 1.43.0 | [#24250](https://github.com/mlflow/mlflow/pull/24250) |
+| `45946ec` | drop: Match any non-zero exit code in `test_host_invalid_value` | [#24288](https://github.com/mlflow/mlflow/pull/24288) |
 
 ---
 

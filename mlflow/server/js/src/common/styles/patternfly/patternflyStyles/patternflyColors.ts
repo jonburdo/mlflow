@@ -25,6 +25,8 @@ import {
   c_button_m_tertiary_m_clicked_BorderColor,
   t_global_border_color_default,
   t_global_color_status_danger_hover,
+  t_global_border_color_status_success_default,
+  t_global_text_color_placeholder,
 } from '@patternfly/react-tokens';
 import pfTokens from 'mod-arch-kubeflow/dist/style/pf-tokens-SSOT.json';
 
@@ -90,10 +92,15 @@ export const colorList = {
   borderDanger: t_global_border_color_status_danger_default.var,
   borderWarning: t_global_border_color_status_warning_default.var,
 
-  textPlaceholder: c_content_Color.var,
+  textPlaceholder: t_global_text_color_placeholder.var,
   textPrimary: c_content_Color.var,
   textSecondary: c_content_Color.var,
   textValidationDanger: t_global_text_color_regular.var,
   textValidationSuccess: t_global_text_color_regular.var,
   textValidationWarning: t_global_text_color_regular.var,
+
+  green300: `color-mix(in srgb, ${t_global_border_color_status_success_default.var} 25%, transparent)`,
+  green700: t_global_border_color_status_success_default.var,
+  red300: `color-mix(in srgb, ${t_global_border_color_status_danger_default.var} 25%, transparent)`,
+  red700: t_global_border_color_status_danger_default.var,
 } satisfies Record<string, string>;
