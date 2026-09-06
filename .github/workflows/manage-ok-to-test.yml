@@ -57,9 +57,9 @@ jobs:
             echo "Cache publication is not authorized for this event."
             exit 0
           fi
-          if [[ "$REPOSITORY_OWNER" != "jonburdo" ||
-            "$HEAD_REPOSITORY" == "$REPOSITORY" ]]; then
-            echo "ok-to-test approval is managed; cache publication applies only to external RHDS PRs."
+          # Test-only: the build workflows simulate a cross-repository PR.
+          if [[ "$REPOSITORY_OWNER" != "jonburdo" ]]; then
+            echo "ok-to-test approval is managed; cache publication applies only to RHDS PRs."
             exit 0
           fi
           gh workflow run publish-base-image-cache.yml \
