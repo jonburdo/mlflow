@@ -12471,6 +12471,10 @@
     "defaultMessage": "Model Config:",
     "description": "Label for model configuration in the prompt details page"
   },
+  "qKQpG1": {
+    "defaultMessage": "No comparisons available",
+    "description": "Header displayed in the metrics and params compare plot when no values are selected"
+  },
   "qMwRy3": {
     "defaultMessage": "Registered Models",
     "description": "Header for displaying models in the model registry"
@@ -13910,10 +13914,6 @@
   "x03ytD": {
     "defaultMessage": "e.g., END, ###, STOP",
     "description": "Placeholder for stop sequences input"
-  },
-  "x0K27S": {
-    "defaultMessage": "Nothing to compare!",
-    "description": "Header displayed in the metrics and params compare plot when no values are selected"
   },
   "x1AvSq": {
     "defaultMessage": "Back",
