@@ -1,3 +1,5 @@
+ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.7
+
 FROM registry.access.redhat.com/ubi9/nodejs-24:9.7 AS ui-builder
 WORKDIR /opt/app-root/src
 USER 0
@@ -34,7 +36,7 @@ RUN if [ -f /cachi2/cachi2.env ]; then . /cachi2/cachi2.env; fi && \
     python -m build --wheel --outdir /tmp/dist libs/skinny && \
     python -m build --wheel --outdir /tmp/dist .
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
+FROM ${BASE_IMAGE}
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MLFLOW_DISABLE_TELEMETRY=true \
