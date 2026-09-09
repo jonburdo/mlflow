@@ -116,8 +116,8 @@ jobs:
         if: env.IS_RHDS_REPOSITORY == 'true' && env.IS_CROSS_REPOSITORY_PR == 'true'
         uses: ./.github/actions/resolve-base-image
         with:
-          repository: opendatahub-io/mlflow
-          ref: master
+          repository: jonburdo/mlflow
+          ref: image-auth-odh
           dockerfile: Dockerfile.konflux
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -195,8 +195,8 @@ jobs:
         if: env.IS_RHDS_REPOSITORY == 'true' && env.IS_CROSS_REPOSITORY_PR == 'true'
         uses: ./.github/actions/resolve-base-image
         with:
-          repository: opendatahub-io/mlflow-operator
-          ref: main
+          repository: jonburdo/mlflow-operator
+          ref: image-auth-odh
           dockerfile: Dockerfile
           token: ${{ secrets.GITHUB_TOKEN }}
 
