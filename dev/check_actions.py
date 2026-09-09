@@ -34,6 +34,10 @@ _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 # Requires at least vMAJOR.MINOR.PATCH to avoid ambiguous moving tags like v4.
 _VERSION_COMMENT_RE = re.compile(r"^v\d+\.\d+\.\d+(?:\.\d+)*$")
 
+# Locally maintained actions can be pinned directly to a commit before they
+# have a release tag. The SHA requirement still applies.
+_UNVERSIONED_ACTION_COMMENTS = {"internal", "local"}
+
 _CACHE_PATH = Path(".cache/action-pins.json")
 
 # Downstream-only workflow, excluded here since it's globbed directly and
@@ -126,10 +130,13 @@ def _check_action(a: ActionRef, cache: dict[str, bool]) -> str | None:
     if not _SHA_RE.match(a.ref):
         return f"{a.prefix}\n  error: ref '{a.ref}' is not a 40-character SHA"
 
+    if a.comment in _UNVERSIONED_ACTION_COMMENTS:
+        return None
+
     if not a.comment or not _VERSION_COMMENT_RE.match(a.comment):
         return (
             f"{a.prefix}\n  error: missing or invalid version comment"
-            f" (expected '# vX.Y.Z', got {a.comment!r})"
+            f" (expected '# vX.Y.Z', '# internal', or '# local', got {a.comment!r})"
         )
 
     verified = _verify_sha_tag(a.action, a.ref, a.comment, cache)
