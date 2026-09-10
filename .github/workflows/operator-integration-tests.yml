@@ -113,6 +113,9 @@ jobs:
 
       # Trusted RHDS runs use the checked-out default after login.
       # Cross-repository PRs targeting RHDS use ODH's public base image.
+      #
+      # NOTE: mlflow's resolve-base-image action is used here,
+      # although both mlflow and mlflow-operator define this action.
       - name: Resolve public base image
         id: public-base-image
         if: env.IS_RHDS_REPOSITORY == 'true' && env.IS_CROSS_REPOSITORY_PR == 'true'
@@ -192,6 +195,8 @@ jobs:
             echo "path=Dockerfile" >> "$GITHUB_OUTPUT"
           fi
 
+      # NOTE: mlflow-operator's resolve-base-image action is used here,
+      # although both mlflow and mlflow-operator define this action.
       - name: Resolve public base image
         id: public-base-image
         if: env.IS_RHDS_REPOSITORY == 'true' && env.IS_CROSS_REPOSITORY_PR == 'true'
