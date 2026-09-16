@@ -19,9 +19,27 @@ on:
       - branch-[0-9]+.[0-9]+
       - main
       - rhoai-*
+      - ci-test-*
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to test"
+        required: true
+        default: main
+        type: choice
+        options:
+          - main
+          - rhoai-3.2
+          - rhoai-3.3
+          - rhoai-3.4
+          - rhoai-3.5
+      ref:
+        description: "Optional branch, tag, or commit SHA; overrides the branch selection"
+        required: false
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ inputs.ref || inputs.branch || github.ref }}
   cancel-in-progress: true
 
 # Use `bash` by default for all `run` steps in this workflow:
@@ -62,6 +80,7 @@ jobs:
         with:
           persist-credentials: false
           submodules: true
+          ref: ${{ inputs.ref || inputs.branch || github.sha }}
       - uses: ./.github/actions/untracked
       - uses: ./.github/actions/free-disk-space
       - uses: ./.github/actions/setup-python
@@ -111,6 +130,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+          ref: ${{ inputs.ref || inputs.branch || github.sha }}
       - uses: ./.github/actions/untracked
       - name: Build
         run: |
