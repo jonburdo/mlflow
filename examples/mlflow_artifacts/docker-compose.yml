@@ -1,7 +1,7 @@
 version: "3"
 services:
   minio:
-    image: minio/minio
+    image: quay.io/minio/minio:latest
     expose:
       - "9000"
     ports:
@@ -20,7 +20,7 @@ services:
     command: server /data --console-address ":9001"
 
   minio-create-bucket:
-    image: minio/mc
+    image: quay.io/minio/mc:latest
     depends_on:
       minio:
         condition: service_healthy
