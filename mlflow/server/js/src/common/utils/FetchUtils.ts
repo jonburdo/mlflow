@@ -60,6 +60,8 @@ export const getDefaultHeaders = (cookieStr: any) => {
 };
 
 export const getAjaxUrl = (relativeUrl: any) => {
+  if (/^https?:\/\//i.test(relativeUrl)) return relativeUrl;
+
   // In federated mode, prefix with the MLflow proxy base path.
   const prefixed = prefixApiUrl(relativeUrl);
   if (prefixed) return prefixed;

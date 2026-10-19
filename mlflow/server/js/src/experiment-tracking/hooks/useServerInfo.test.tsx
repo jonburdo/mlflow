@@ -14,6 +14,9 @@ import {
   getFeatureEnabledSync,
   getWorkspacesEnabledSync,
   getMultipartDownloadsEnabledSync,
+  getArtifactsPresignedOnlySync,
+  getModelArtifactPresignedDownloadsSupportedSync,
+  getLoggedModelArtifactReadCredentialsSupportedSync,
   resetServerInfoCache,
   SERVER_FEATURE_KEYS,
   ServerInfoProvider,
@@ -317,6 +320,41 @@ const renderWithProviders = (ui: React.ReactElement, queryClient: QueryClient) =
   );
 };
 
+describe('model artifact download capability discovery', () => {
+  let queryClient: QueryClient;
+  let capabilities: Record<string, boolean>;
+
+  setupServer(
+    rest.get('/ajax-api/3.0/mlflow/server-info', (_req, res, ctx) =>
+      res(ctx.json({ store_type: 'SqlStore', ...capabilities })),
+    ),
+  );
+
+  beforeEach(() => {
+    queryClient = createTestQueryClient();
+    capabilities = {};
+  });
+
+  afterEach(() => {
+    resetServerInfoCache();
+    queryClient.clear();
+  });
+
+  test.each<{ fields: Record<string, boolean>; signing: boolean; credentials: boolean }>([
+    { fields: {}, signing: false, credentials: false },
+    { fields: { model_artifact_presigned_downloads_supported: true }, signing: true, credentials: false },
+    { fields: { logged_model_artifact_read_credentials_supported: true }, signing: false, credentials: true },
+  ])('uses only the advertised model artifact APIs: $fields', async ({ fields, signing, credentials }) => {
+    capabilities = fields;
+    renderWithProviders(<span />, queryClient);
+    await waitFor(() => {
+      expect(queryClient.getQueryData<{ store_type: string }>(['serverInfo'])?.store_type).toBe('SqlStore');
+    });
+    expect(getModelArtifactPresignedDownloadsSupportedSync()).toBe(signing);
+    expect(getLoggedModelArtifactReadCredentialsSupportedSync()).toBe(credentials);
+  });
+});
+
 describe('useWorkspacesEnabled and getWorkspacesEnabledSync', () => {
   let queryClient: QueryClient;
 
@@ -586,5 +624,48 @@ describe('useServerInfo when the browser reports being offline', () => {
     });
 
     expect(result.current.workspacesEnabled).toBe(true);
+  });
+});
+
+describe('federated artifact capabilities', () => {
+  const originalApiBaseUrl = process.env['MLFLOW_API_BASE_URL'];
+  let requests = 0;
+  setupServer(
+    rest.get('/mlflow/ajax-api/3.0/mlflow/server-info', (_req, res, ctx) => {
+      requests += 1;
+      return res(
+        ctx.json({
+          store_type: 'SqlStore',
+          workspaces_enabled: true,
+          trace_archival_enabled: false,
+          multipart_uploads_enabled: true,
+          multipart_downloads_enabled: true,
+          artifacts_presigned_only: true,
+          model_artifact_presigned_downloads_supported: true,
+        }),
+      );
+    }),
+  );
+  beforeEach(() => {
+    process.env['MLFLOW_API_BASE_URL'] = '/mlflow';
+    requests = 0;
+  });
+  afterEach(() => {
+    if (originalApiBaseUrl === undefined) delete process.env['MLFLOW_API_BASE_URL'];
+    else process.env['MLFLOW_API_BASE_URL'] = originalApiBaseUrl;
+    resetServerInfoCache();
+  });
+  test('loads enforced transfer capabilities through the dashboard proxy exactly once', async () => {
+    const queryClient = new QueryClient();
+    const federatedWrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>
+        <ServerInfoProvider>{children}</ServerInfoProvider>
+      </QueryClientProvider>
+    );
+    const { result } = renderHook(() => useServerInfo(), { wrapper: federatedWrapper });
+    await waitFor(() => expect(result.current.data?.artifacts_presigned_only).toBe(true));
+    expect(getArtifactsPresignedOnlySync()).toBe(true);
+    expect(getModelArtifactPresignedDownloadsSupportedSync()).toBe(true);
+    expect(requests).toBe(1);
   });
 });
