@@ -19,15 +19,29 @@ prometheus-client
 kubernetes
 
 # Cross-arch constraints: pin packages to versions available on all target
-# architectures (aarch64, ppc64le, x86_64) on the AIPCC index.
-matplotlib==3.10.8
-pyarrow<23.0.1
+# architectures (amd64, arm64, ppc64le, s390x) on the AIPCC index.
+# hf-xet has no ppc64le or s390x wheel; retain its platform marker in the
+# generated lock when regenerating it.
+aiohttp==3.14.4
+cryptography==48.0.1
 litellm<2,>=1.0.0
-pydantic==2.13.1
-tokenizers==0.22.2
+matplotlib==3.11.0
+numpy==2.5.1
+pyarrow<23.0.1
+pydantic==2.13.4
+scikit-learn==1.9.0
+sqlalchemy==2.0.49
+tokenizers==0.23.1
+yarl==1.25.1
 
 # Pillow 12.3.0+ fixes CVE-2026-59199 (and related Pillow CVEs) in the shipped runtime image.
 pillow>=12.3.0
+
+# pyasn1 0.6.4+ fixes CVE-2026-59884/59885/59886 (DoS via crafted ASN.1 inputs).
+pyasn1>=0.6.4
+
+# GitPython 3.1.51+ fixes CVE-2026-67325 (and CVE-2026-67323) command injection issues in the shipped runtime image.
+gitpython>=3.1.51
 
 # sqlparse 0.6.0+ fixes CVE-2026-71491 (quadratic CPU consumption in comment grouping).
 sqlparse>=0.6.0
