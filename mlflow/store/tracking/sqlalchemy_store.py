@@ -9210,12 +9210,17 @@ def _get_search_experiments_filter_clauses(parsed_filters, dialect):
                 raise MlflowException.invalid_parameter_value(
                     f"Invalid comparator for string attribute: {comparator}"
                 )
-            if SearchExperimentsUtils.is_numeric_attribute(
-                type_, key, comparator
-            ) and comparator not in ("=", "!=", "<", "<=", ">", ">="):
-                raise MlflowException.invalid_parameter_value(
-                    f"Invalid comparator for numeric attribute: {comparator}"
-                )
+            if key in SearchExperimentsUtils.NUMERIC_ATTRIBUTES:
+                if comparator not in SearchExperimentsUtils.VALID_NUMERIC_ATTRIBUTE_COMPARATORS:
+                    raise MlflowException.invalid_parameter_value(
+                        f"Invalid comparator for numeric attribute: {comparator}"
+                    )
+                try:
+                    value = int(value)
+                except (TypeError, ValueError):
+                    raise MlflowException.invalid_parameter_value(
+                        f"Invalid value for numeric attribute '{key}': {value!r}"
+                    )
             attr = getattr(SqlExperiment, key)
             attr_filter = SearchUtils.get_sql_comparison_func(comparator, dialect)(attr, value)
             attribute_filters.append(attr_filter)
@@ -9622,12 +9627,20 @@ def _get_search_datasets_filter_clauses(parsed_filters, dialect):
                 raise MlflowException.invalid_parameter_value(
                     f"Invalid comparator for string attribute: {comparator}"
                 )
-            if SearchEvaluationDatasetsUtils.is_numeric_attribute(
-                type_, key, comparator
-            ) and comparator not in ("=", "!=", "<", "<=", ">", ">="):
-                raise MlflowException.invalid_parameter_value(
-                    f"Invalid comparator for numeric attribute: {comparator}"
-                )
+            if key in SearchEvaluationDatasetsUtils.NUMERIC_ATTRIBUTES:
+                if (
+                    comparator
+                    not in SearchEvaluationDatasetsUtils.VALID_NUMERIC_ATTRIBUTE_COMPARATORS
+                ):
+                    raise MlflowException.invalid_parameter_value(
+                        f"Invalid comparator for numeric attribute: {comparator}"
+                    )
+                try:
+                    value = int(value)
+                except (TypeError, ValueError):
+                    raise MlflowException.invalid_parameter_value(
+                        f"Invalid value for numeric attribute '{key}': {value!r}"
+                    )
             attr = getattr(SqlEvaluationDataset, key)
             attr_filter = SearchUtils.get_sql_comparison_func(comparator, dialect)(attr, value)
             attribute_filters.append(attr_filter)
