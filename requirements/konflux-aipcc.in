@@ -30,7 +30,7 @@ numpy==2.5.1
 pyarrow<23.0.1
 pydantic==2.13.4
 scikit-learn==1.9.0
-sqlalchemy==2.0.49
+sqlalchemy==2.0.54
 tokenizers==0.23.1
 yarl==1.25.1
 
