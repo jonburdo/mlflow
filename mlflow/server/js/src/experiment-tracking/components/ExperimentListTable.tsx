@@ -33,6 +33,7 @@ import { ExperimentListTableTagsCell } from './ExperimentListTableTagsCell';
 import { isDemoExperiment } from '../utils/isDemoExperiment';
 import { useIsIntegrated } from '../../common/utils/embedUtils';
 import noExperimentsImg from '../../odh/static/rh-no-experiments.svg';
+import noAgentTracesImg from '../../odh/static/rh-no-agent-traces.svg';
 
 export type ExperimentTableColumnDef = ColumnDef<ExperimentEntity>;
 
@@ -133,6 +134,7 @@ export const ExperimentListTable = ({
   sortingProps: { sorting, setSorting },
   onEditTags,
   onCreateExperiment,
+  genAIOnly = false,
 }: {
   experiments?: ExperimentEntity[];
   isFiltered?: boolean;
@@ -143,6 +145,7 @@ export const ExperimentListTable = ({
   sortingProps: { sorting: SortingState; setSorting: OnChangeFn<SortingState> };
   onEditTags: (editedEntity: ExperimentEntity) => void;
   onCreateExperiment?: () => void;
+  genAIOnly?: boolean;
 }) => {
   const { theme } = useDesignSystemTheme();
   const columns = useExperimentsTableColumns();
@@ -199,7 +202,12 @@ export const ExperimentListTable = ({
             padding: theme.spacing.md,
           }}
         >
-          <img css={{ maxWidth: 'min(100%, 600px)' }} src={noExperimentsImg} alt="" />
+          <img
+            css={{ maxWidth: 'min(100%, 600px)' }}
+            src={genAIOnly ? noAgentTracesImg : noExperimentsImg}
+            alt=""
+            data-testid="experiments-empty-state-illustration"
+          />
           <Typography.Title level={3} css={{ marginTop: theme.spacing.md }}>
             <FormattedMessage defaultMessage="No experiments" description="Home page experiments empty state title" />
           </Typography.Title>
