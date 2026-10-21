@@ -57,11 +57,16 @@ RUN set -eux; \
         /tmp/dist/mlflow_skinny-*.whl \
         /tmp/dist/mlflow-*.whl \
         /tmp/dist/mlflow_kubernetes_plugins-*.whl \
+        /tmp/dist/oauthlib-*.whl \
         /tmp/dist/prometheus_flask_exporter-*.whl \
         /tmp/dist/psycopg2-*.whl \
         /tmp/dist/starlette-*.whl && \
     microdnf clean all && \
     rm -rf /tmp/dist /tmp/konflux-aipcc-requirements.txt
+
+# Fail the build if a shipped plugin cannot register its required entry points.
+RUN python3.12 -m pip check && \
+    python3.12 -c 'from importlib.metadata import entry_points; next(ep for ep in entry_points(group="mlflow.workspace_provider") if ep.name == "kubernetes").load(); next(ep for ep in entry_points(group="mlflow.app") if ep.name == "kubernetes-auth").load()'
 
 # Copy built UI from builder stage
 COPY --from=ui-builder /opt/app-root/src/build /tmp/mlflow-ui-build

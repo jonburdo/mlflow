@@ -5,6 +5,10 @@ mlflow-kubernetes-plugins==1.1.1 \
     --hash=sha256:9e0bebfe88af3a18f3c17bf8e1b70c71c27fc23fd8bebeebd4901e14c7b5ebd5 \
     --hash=sha256:f42b7d9f20f09a327a95013f7602edd13316c8d805a324d758646df79fb5bf3f
     # via -r requirements/konflux-pypi.in
+oauthlib==4.0.0 \
+    --hash=sha256:624c28c13a0a59cabf9747dfa52af63be3e512a7f2714df16e91b5b3a145e6cd \
+    --hash=sha256:efb274799819440f95b4ab3b818869f1ce9ae26c5beacba0201d1a1b76b54f86
+    # via -r requirements/konflux-pypi.in
 prometheus-flask-exporter==0.23.2 \
     --hash=sha256:41fc9bbd7d48cc958ed8384aacf60c3621d9e903768be61c4e7f0c63872eaf1a \
     --hash=sha256:94922a636d4c1d8b68e1ee605c30a23e9bbb0b21756df8222aa919634871784c

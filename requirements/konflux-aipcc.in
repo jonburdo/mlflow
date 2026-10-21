@@ -16,6 +16,8 @@
 
 boto3
 prometheus-client
+# Required by mlflow-kubernetes-plugins, whose wheel is installed with --no-deps.
+kubernetes==35.0.0
 
 # Cross-arch constraints: pin packages to versions available on all target
 # architectures (aarch64, ppc64le, x86_64) on the AIPCC index.
