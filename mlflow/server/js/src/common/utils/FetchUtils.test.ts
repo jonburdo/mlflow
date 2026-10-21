@@ -10,6 +10,7 @@ import {
   defaultResponseParser,
   getDefaultHeaders,
   getDefaultHeadersFromCookies,
+  getAjaxUrl,
   HTTPMethods,
   HTTPRetryStatuses,
   parseResponse,
@@ -49,6 +50,36 @@ describe('FetchUtils', () => {
       expect(
         getDefaultHeadersFromCookies(`a=b; mlflow-request-header-My-CSRF=1; mlflow-request-header-Hello=World; c=d`),
       ).toEqual({ 'My-CSRF': '1', Hello: 'World' });
+    });
+  });
+  describe('getAjaxUrl', () => {
+    const originalUseAbsoluteAjaxUrls = process.env['MLFLOW_USE_ABSOLUTE_AJAX_URLS'];
+    const originalApiBaseUrl = process.env['MLFLOW_API_BASE_URL'];
+
+    afterEach(() => {
+      if (originalApiBaseUrl === undefined) delete process.env['MLFLOW_API_BASE_URL'];
+      else process.env['MLFLOW_API_BASE_URL'] = originalApiBaseUrl;
+      if (originalUseAbsoluteAjaxUrls === undefined) {
+        delete process.env['MLFLOW_USE_ABSOLUTE_AJAX_URLS'];
+      } else {
+        process.env['MLFLOW_USE_ABSOLUTE_AJAX_URLS'] = originalUseAbsoluteAjaxUrls;
+      }
+    });
+
+    it.each([false, true])('keeps federated proxy routing with absolute AJAX set to %s', (absolute) => {
+      process.env['MLFLOW_API_BASE_URL'] = '/mlflow';
+      process.env['MLFLOW_USE_ABSOLUTE_AJAX_URLS'] = String(absolute);
+      expect(getAjaxUrl('ajax-api/2.0/mlflow/runs/get')).toBe('/mlflow/ajax-api/2.0/mlflow/runs/get');
+      expect(getAjaxUrl('/ajax-api/2.0/mlflow/runs/get')).toBe('/mlflow/ajax-api/2.0/mlflow/runs/get');
+      const explicitService = `${window.location.origin}/artifact-service/api/2.0/mlflow-artifacts/presigned/file`;
+      expect(getAjaxUrl(explicitService)).toBe(explicitService);
+    });
+
+    it('does not rewrite a fully qualified URL', () => {
+      process.env['MLFLOW_USE_ABSOLUTE_AJAX_URLS'] = 'true';
+      expect(getAjaxUrl('https://artifacts.example/prefix/api/2.0/mlflow-artifacts/presigned/file')).toBe(
+        'https://artifacts.example/prefix/api/2.0/mlflow-artifacts/presigned/file',
+      );
     });
   });
   describe('getDefaultHeaders', () => {
