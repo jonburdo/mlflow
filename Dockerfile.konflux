@@ -57,6 +57,7 @@ RUN set -eux; \
         /tmp/dist/mlflow_skinny-*.whl \
         /tmp/dist/mlflow-*.whl \
         /tmp/dist/mlflow_kubernetes_plugins-*.whl \
+        /tmp/dist/oauthlib-*.whl \
         /tmp/dist/prometheus_flask_exporter-*.whl \
         /tmp/dist/psycopg2-*.whl \
         /tmp/dist/starlette-*.whl && \
