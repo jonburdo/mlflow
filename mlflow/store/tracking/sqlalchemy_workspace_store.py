@@ -255,11 +255,17 @@ class WorkspaceAwareSqlAlchemyStore(WorkspaceAwareMixin, SqlAlchemyStore):
             return [str(row[0]) for row in rows]
 
         if entity_type == EntityAssociationType.EXPERIMENT:
+            try:
+                experiment_ids = [int(entity_id) for entity_id in entity_ids]
+            except (TypeError, ValueError):
+                raise MlflowException.invalid_parameter_value(
+                    f"Experiment IDs must be valid integers: {entity_ids}"
+                )
             rows = (
                 session
                 .query(SqlExperiment.experiment_id)
                 .filter(
-                    SqlExperiment.experiment_id.in_(entity_ids),
+                    SqlExperiment.experiment_id.in_(experiment_ids),
                     SqlExperiment.workspace == workspace,
                 )
                 .all()
