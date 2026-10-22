@@ -239,7 +239,8 @@
     "postcss@npm:^8.4.4": "npm:8.5.12",
     "postcss@npm:^8.4.33": "npm:8.5.12",
     "postcss@npm:^8.4.40": "npm:8.5.12",
-    "postcss@npm:^8.4.47": "npm:8.5.12"
+    "postcss@npm:^8.4.47": "npm:8.5.12",
+    "source-map-js": "1.2.2"
   },
   "//": "homepage is hard to configure without resorting to env variables and doesn't play nicely with other webpack settings. This field should be removed.",
   "homepage": "static-files",
