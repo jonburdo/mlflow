@@ -18,9 +18,10 @@ boto3
 prometheus-client
 # Required by mlflow-kubernetes-plugins, whose wheel is installed with --no-deps.
 kubernetes==35.0.0
-# Protobuf 6.32+ crashes while importing MLflow's generated descriptors on
-# s390x with RHEL 9.8 / Python 3.12 (upstream: protobuf#29651).
-protobuf==6.31.1
+# Protobuf 7.34.1 crashes while importing MLflow's generated descriptors on
+# s390x. Version 7.35.1 passes the descriptor import check there (protobuf#29651).
+protobuf==7.34.1; platform_machine != "s390x"
+protobuf==7.35.1; platform_machine == "s390x"
 
 # Cross-arch constraints: pin packages to versions available on all target
 # architectures (aarch64, ppc64le, x86_64) on the AIPCC index.

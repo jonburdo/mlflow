@@ -5,6 +5,8 @@ inside Docker containers for each target architecture, then merges the
 per-architecture hashes into a single output file. Packages explicitly listed
 in requirements/konflux-pypi.in are omitted from the final-image AIPCC output
 so SBOM and CVE tooling see a single source of truth per shipped package.
+Packages resolving to multiple versions get platform_machine markers;
+single-version packages remain unmarked.
 
 For PyPI requirements (konflux-pypi), runs a single uv pip compile since these
 packages are built from source and don't need multi-arch hashes.
@@ -20,13 +22,15 @@ import shlex
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
-from typing import Any
 
+from packaging.markers import Marker
 from pip._internal.network.session import PipSession
+from pip._internal.req.req_install import InstallRequirement
 from piptools._compat.pip_compat import parse_requirements
 from piptools.utils import format_requirement, get_hashes_from_ireq
 
@@ -34,7 +38,13 @@ AIPCC_INDEX_URL = "https://console.redhat.com/api/pypi/public-rhai/rhoai/3.4/cpu
 
 DEFAULT_DOCKER_IMAGE = "registry.access.redhat.com/ubi9/python-312:9.7"
 
-ARCHES = ["amd64", "arm64", "ppc64le", "s390x"]
+# Docker architecture names mapped to Python's platform.machine() values.
+ARCHES = {
+    "amd64": "x86_64",
+    "arm64": "aarch64",
+    "ppc64le": "ppc64le",
+    "s390x": "s390x",
+}
 
 # Packages that are expected to be unavailable on specific architectures
 # (e.g. greenlet has no s390x wheel and is excluded via platform markers).
@@ -55,6 +65,13 @@ class CompileTarget:
     index_url: str | None = None
     emit_index_url: bool = False
     extra_uv_args: list[str] = field(default_factory=list)
+
+
+@dataclass
+class LockedRequirement:
+    ireq: InstallRequirement
+    hashes: set[str] = field(default_factory=set)
+    arches: set[str] = field(default_factory=set)
 
 
 MULTIARCH_TARGETS = [
@@ -166,17 +183,11 @@ def run_uv_compile_in_docker(
 
 def parse_and_collect_hashes(
     arch_outputs: dict[str, str],
-) -> tuple[dict[str, Any], dict[str, set[str]]]:
-    """Parse per-arch pip-compile outputs and merge hashes.
-
-    Returns:
-        canonical_ireqs: {canonical_name: InstallRequirement} from the first arch
-        merged_hashes: {canonical_name: set of "algo:hexdigest" strings}
-    """
+) -> dict[tuple[str, str], LockedRequirement]:
+    """Merge hashes by (canonical name, version), allowing one package entry per arch."""
     session = PipSession()
-    canonical_ireqs: dict[str, Any] = {}
-    merged_hashes: dict[str, set[str]] = {}
-    versions: dict[str, dict[str, str]] = {}
+    requirements: dict[tuple[str, str], LockedRequirement] = {}
+    package_arches: dict[str, set[str]] = {}
 
     for arch, raw_output in arch_outputs.items():
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
@@ -191,19 +202,18 @@ def parse_and_collect_hashes(
         for ireq in ireqs:
             name = _canonicalize(ireq.req.name)
             version = str(ireq.req.specifier)
-            hashes = get_hashes_from_ireq(ireq)
+            arches = package_arches.setdefault(name, set())
+            if arch in arches:
+                raise SystemExit(f"Duplicate package {name} for architecture {arch}.")
+            arches.add(arch)
 
-            if name not in canonical_ireqs:
-                canonical_ireqs[name] = ireq
-                merged_hashes[name] = set()
-                versions[name] = {}
-
-            versions[name][arch] = version
-            merged_hashes[name] |= hashes
+            requirement = requirements.setdefault((name, version), LockedRequirement(ireq))
+            requirement.arches.add(arch)
+            requirement.hashes |= get_hashes_from_ireq(ireq)
 
     all_arches = set(arch_outputs)
-    for name, arch_versions in versions.items():
-        if missing := all_arches - set(arch_versions):
+    for name, arches in package_arches.items():
+        if missing := all_arches - arches:
             allowed = {a for a in missing if name in ARCH_MISSING_ALLOWLIST.get(a, set())}
 
             if unexpected := missing - allowed:
@@ -213,24 +223,13 @@ def parse_and_collect_hashes(
                     "All architectures must resolve the same set of packages. "
                     "If this is expected, add the package to ARCH_MISSING_ALLOWLIST."
                 )
-        unique = set(arch_versions.values())
-        if len(unique) > 1:
-            detail = ", ".join(f"{a}: {v}" for a, v in sorted(arch_versions.items()))
-            raise SystemExit(
-                f"Version mismatch for {name}: {detail}. "
-                "All architectures must resolve to the same version. "
-                "Add an explicit constraint for this package to the relevant "
-                "AIPCC input file (for example `requirements/konflux-aipcc.in`) "
-                "and rerun `python requirements/compile.py`."
-            )
 
-    return canonical_ireqs, merged_hashes
+    return requirements
 
 
 def write_multiarch_output(
     target: CompileTarget,
-    canonical_ireqs: dict[str, Any],
-    merged_hashes: dict[str, set[str]],
+    requirements: dict[tuple[str, str], LockedRequirement],
     excluded_names: set[str] | None = None,
 ) -> None:
     out_path = REPO_ROOT / target.out_file
@@ -249,12 +248,20 @@ def write_multiarch_output(
     if target.emit_index_url and target.index_url:
         parts.append(f"--index-url {target.index_url}\n\n")
 
-    for name in sorted(canonical_ireqs):
+    version_counts = Counter(name for name, _ in requirements)
+    for (name, _), requirement in sorted(requirements.items()):
         if excluded_names and name in excluded_names:
             continue
-        ireq = canonical_ireqs[name]
-        hashes = merged_hashes[name]
-        parts.append(format_requirement(ireq, hashes=hashes) + "\n")
+        marker = None
+        if version_counts[name] > 1:
+            marker = Marker(
+                " or ".join(
+                    f'platform_machine == "{ARCHES[arch]}"' for arch in sorted(requirement.arches)
+                )
+            )
+        parts.append(
+            format_requirement(requirement.ireq, marker=marker, hashes=requirement.hashes) + "\n"
+        )
 
     out_path.write_text("".join(parts))
     log(f"  wrote {target.out_file}")
@@ -307,13 +314,15 @@ def compile_multiarch(target: CompileTarget, image: str) -> None:
                 arch = futures[future]
                 arch_outputs[arch] = future.result()
 
-        canonical_ireqs, merged_hashes = parse_and_collect_hashes(arch_outputs)
+        requirements = parse_and_collect_hashes(arch_outputs)
 
         excluded_names = (
             read_requirements_names(KONFLUX_PYPI_IN) if target.name == "konflux-aipcc" else None
         )
         write_multiarch_output(
-            target, canonical_ireqs, merged_hashes, excluded_names=excluded_names
+            target,
+            requirements,
+            excluded_names=excluded_names,
         )
     finally:
         for arch_tag in arch_images.values():
