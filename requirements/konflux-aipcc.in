@@ -38,8 +38,9 @@ tiktoken==0.12.0
 tokenizers==0.22.2
 yarl==1.23.0
 
-# Pillow 12.3.0+ fixes CVE-2026-59199 (and related Pillow CVEs) in the shipped runtime image.
-pillow>=12.3.0
+# CVE-2026-112895
+# CVE-2026-59199
+pillow>=13.0.0
 
 # pyasn1 0.6.4+ fixes CVE-2026-59884 (DoS via crafted BER/CER/DER long-form tag IDs).
 pyasn1>=0.6.4
