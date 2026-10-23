@@ -253,6 +253,7 @@ export const ExperimentListView = () => {
           sortingProps={{ sorting, setSorting }}
           onEditTags={showEditExperimentTagsModal}
           onCreateExperiment={handleCreateExperiment}
+          genAIOnly={genAIOnly}
         />
       </div>
       <CreateExperimentModal

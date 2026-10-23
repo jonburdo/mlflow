@@ -28,6 +28,12 @@ jest.mock('./experiment-page/hooks/useTagsFilter', () => ({
   useTagsFilter: jest.fn(),
 }));
 
+let mockIsIntegrated = false;
+jest.mock('../../common/utils/embedUtils', () => ({
+  ...jest.requireActual<typeof import('../../common/utils/embedUtils')>('../../common/utils/embedUtils'),
+  useIsIntegrated: () => mockIsIntegrated,
+}));
+
 beforeEach(() => {
   // The search filter lives in the URL, which jsdom keeps between tests
   // eslint-disable-next-line no-restricted-properties
@@ -40,7 +46,9 @@ const mountComponent = (props: {
   filterBySearch?: boolean;
   workflowType?: WorkflowType;
   isLocked?: boolean;
+  integrated?: boolean;
 }) => {
+  mockIsIntegrated = props.integrated ?? false;
   const mockStore = configureStore([thunk, promiseMiddleware()]);
 
   jest.mocked(useExperimentListQuery).mockImplementation((params) => ({
@@ -210,5 +218,23 @@ test.each([
     await waitFor(() => expect(createExperiment).toHaveBeenCalledWith(expect.objectContaining({ name: 'my-agent' })));
     expect(createExperiment.mock.calls[0][0].tags).toEqual(expectedTags);
     createExperiment.mockRestore();
+  },
+);
+
+test.each([
+  [WorkflowType.GENAI, true, 'rh-no-agent-traces.svg'],
+  [WorkflowType.GENAI, false, 'rh-no-experiments.svg'],
+  [WorkflowType.MACHINE_LEARNING, true, 'rh-no-experiments.svg'],
+  [WorkflowType.MACHINE_LEARNING, false, 'rh-no-experiments.svg'],
+])(
+  'when embedded with workflow type %s and locked is %s, the empty state illustration is %s',
+  (workflowType, isLocked, illustration) => {
+    mountComponent({ experiments: [], workflowType, isLocked, integrated: true });
+
+    expect(screen.getByText('No experiments')).toBeInTheDocument();
+    expect(screen.getByTestId('experiments-empty-state-illustration')).toHaveAttribute(
+      'src',
+      expect.stringContaining(illustration),
+    );
   },
 );
