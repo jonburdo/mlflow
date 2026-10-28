@@ -237,7 +237,12 @@
     "rc-virtual-list@^3.0.3": "patch:rc-virtual-list@npm%3A3.2.0#yarn/patches/rc-virtual-list-npm-3.2.0-5efaefc12e.patch",
     "rc-virtual-list@^3.0.1": "patch:rc-virtual-list@npm%3A3.2.0#yarn/patches/rc-virtual-list-npm-3.2.0-5efaefc12e.patch",
     "csstype@^3.0.2": "3.0.11",
-    "nwsapi": "2.2.20"
+    "nwsapi": "2.2.20",
+    "brace-expansion@npm:^1.1.7": "^1.1.20",
+    "brace-expansion@npm:^2.0.1": "^2.1.6",
+    "brace-expansion@npm:^5.0.2": "^5.0.11",
+    "uri-js": ">=4.4.1",
+    "undici": ">=8.12.2"
   },
   "//": "homepage is hard to configure without resorting to env variables and doesn't play nicely with other webpack settings. This field should be removed.",
   "homepage": "static-files",
