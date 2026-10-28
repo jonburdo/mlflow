@@ -7,5 +7,6 @@
 
 build
 hatchling
-setuptools
+# Keep in sync with build-system.requires in the MLflow pyproject files.
+setuptools<=82.0.1
 wheel
