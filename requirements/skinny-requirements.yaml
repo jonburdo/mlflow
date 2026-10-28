@@ -20,7 +20,7 @@ python-dotenv:
 
 gitpython:
   pip_release: gitpython
-  minimum: "3.1.9"
+  minimum: "3.2.0"
   max_major_version: 3
 
 pyyaml:
@@ -54,8 +54,8 @@ importlib_metadata:
 
 sqlparse:
   pip_release: sqlparse
-  # Lower bound sqlparse for: https://github.com/andialbrecht/sqlparse/pull/567
-  minimum: "0.4.0"
+  # Lower bound sqlparse for CVE-2026-71491 (quadratic CPU consumption)
+  minimum: "0.6.0"
   max_major_version: 0
 
 # Required for tracing

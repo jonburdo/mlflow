@@ -24,7 +24,7 @@ kubernetes
 # generated lock when regenerating it.
 aiohttp==3.14.4
 cryptography==48.0.1
-litellm<2,>=1.0.0
+litellm<2,>=1.101.0-rc1
 matplotlib==3.11.0
 numpy==2.5.1
 pyarrow<23.0.1
@@ -40,8 +40,11 @@ pillow>=13.0.0
 # pyasn1 0.6.4+ fixes CVE-2026-59884/59885/59886 (DoS via crafted ASN.1 inputs).
 pyasn1>=0.6.4
 
-# GitPython 3.1.51+ fixes CVE-2026-67325 (and CVE-2026-67323) command injection issues in the shipped runtime image.
-gitpython>=3.1.51
+# GitPython 3.2.0+ fixes CVE-2026-67325 (and CVE-2026-67323) command injection issues in the shipped runtime image.
+gitpython>=3.2.0
+
+# graphql-core 3.2.12+ fixes security vulnerabilities in the shipped runtime image.
+graphql-core>=3.2.12
 
 # sqlparse 0.6.0+ fixes CVE-2026-71491 (quadratic CPU consumption in comment grouping).
 sqlparse>=0.6.0
