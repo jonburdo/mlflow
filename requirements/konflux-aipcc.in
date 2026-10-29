@@ -50,9 +50,11 @@ graphql-core>=3.2.12
 sqlparse>=0.6.0
 
 # Protobuf 6.32+ crashes while importing MLflow's generated descriptors on
-# s390x (upstream: protobuf#29651), so the runtime image cannot start there.
-# 6.31.1 is the last crash-free 6.x on the AIPCC index; it is affected by
-# CVE-2026-0994 (DoS in json_format.ParseDict via nested Any messages),
-# which MLflow's protos do not use. Preferred long-term fix: protobuf 7.x
-# once a databricks-sdk that allows it (>=0.154.0) is on the AIPCC index.
-protobuf==6.31.1
+# s390x (upstream: protobuf#29651), and the last crash-free 6.x (6.31.1) is
+# in the CVE-2026-0994 range. 7.36.1 is both crash-free on s390x and
+# CVE-clean, and is available on all four architectures of the AIPCC index.
+# Requires databricks-sdk >=0.154.0 (the first release allowing protobuf<8);
+# 0.154.0 is what rhoai-3.6 ships. Until it is mirrored to the 3.5 AIPCC
+# index this lock is hand-maintained — regenerate with
+# `python requirements/compile.py` once it lands.
+protobuf==7.36.1
