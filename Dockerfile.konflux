@@ -52,6 +52,7 @@ RUN set -eux; \
     python3.12 -m pip install --no-cache-dir --require-hashes --no-deps \
         -r /tmp/konflux-aipcc-requirements.txt && \
     python3.12 -m pip install --no-cache-dir --no-deps \
+        /tmp/dist/databricks_sdk-*.whl \
         /tmp/dist/mlflow_tracing-*.whl \
         /tmp/dist/mlflow_skinny-*.whl \
         /tmp/dist/mlflow-*.whl \

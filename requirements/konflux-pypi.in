@@ -10,6 +10,12 @@
 #
 #   python requirements/compile.py
 
+# 3.5's AIPCC index only carries databricks-sdk 0.120.0 (protobuf<7.0),
+# which conflicts with the protobuf 7.x pin in requirements/konflux-aipcc.in.
+# 0.154.0 is the first release allowing protobuf<8 and is otherwise
+# dependency-identical to 0.120.0; source it from PyPI until a >=0.154.0
+# build is mirrored to the AIPCC index.
+databricks-sdk==0.154.0
 mlflow-kubernetes-plugins==1.5.0
 psycopg2
 prometheus-flask-exporter
