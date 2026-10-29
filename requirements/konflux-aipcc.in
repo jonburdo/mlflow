@@ -48,3 +48,14 @@ graphql-core>=3.2.12
 
 # sqlparse 0.6.0+ fixes CVE-2026-71491 (quadratic CPU consumption in comment grouping).
 sqlparse>=0.6.0
+
+# Protobuf 6.32+ crashes while importing MLflow's generated descriptors on
+# s390x (upstream: protobuf#29651), and the crash-free 6.31.1 is in the
+# CVE-2026-0994 range. 7.36.1 is both crash-free on s390x and CVE-clean.
+# databricks-sdk 0.120.0 (the newest on the AIPCC index) declares
+# protobuf<7.0, so this pairing is intentionally metadata-inconsistent:
+# pip check is deferred in Dockerfile.konflux and the lock is hand-maintained
+# (compile.py cannot resolve it) until a databricks-sdk >=0.154.0 is mirrored
+# to the AIPCC index. mlflow only exercises databricks-sdk on Databricks
+# backends, which this image does not use.
+protobuf==7.36.1
