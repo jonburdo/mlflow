@@ -14,7 +14,10 @@
 # Packages not on the AIPCC Python package index (psycopg2, prometheus-flask-exporter)
 # are installed separately in the Dockerfile via Cachi2 prefetch.
 
-boto3
+# boto3/botocore held at 1.43.50: 1.43.122 fixes no CVEs; avoid z-stream churn.
+# Both must be pinned: boto3 1.43.50 permits any botocore < 1.44.0.
+boto3==1.43.50
+botocore==1.43.50
 prometheus-client
 kubernetes
 
@@ -23,8 +26,11 @@ kubernetes
 # hf-xet has no ppc64le or s390x wheel; retain its platform marker in the
 # generated lock when regenerating it.
 aiohttp==3.14.4
-# cryptography 49.0.0 fixes CVE-2026-69249 in the shipped runtime image.
-cryptography==49.0.0
+# cryptography 50.0.1 fixes CVE-2026-69247 and CVE-2026-69249 in the shipped runtime image.
+cryptography==50.0.1
+# databricks-sdk 0.154.0 is the first release that allows protobuf 7.x
+# (needed below); pinned exactly to avoid z-stream drift on regen.
+databricks-sdk==0.154.0
 litellm<2,>=1.101.0-rc1
 matplotlib==3.11.0
 numpy==2.5.1
@@ -33,14 +39,25 @@ pydantic==2.13.4
 scikit-learn==1.9.0
 sqlalchemy==2.0.54
 tokenizers==0.23.1
+tzdata==2026.5
 yarl==1.25.1
+
+# hf-xet held at 1.7.0: 1.8.0 fixes no CVEs; avoid z-stream churn.
+# Marker required: no ppc64le/s390x wheels exist (see the note above;
+# compile.py retains the marker in the generated lock).
+hf-xet==1.7.0 ; platform_machine != "ppc64le" and platform_machine != "s390x"
+
+# oauthlib 4.0.1 fixes CVE-2026-118669, CVE-2026-49264, and CVE-2026-49265
+# (fixed in 4.0.0) plus CVE-2026-49272 (fixed in 4.0.1). No 3.x release
+# contains any of these fixes, so the major-version bump is required.
+oauthlib>=4.0.1
 
 # Pillow 13.0.0+ fixes CVE-2026-112895 (and related Pillow CVEs) in the shipped runtime image.
 pillow>=13.0.0
 
-# pyasn1 0.6.4+ fixes CVE-2026-59884/59885/59886 (DoS via crafted ASN.1 inputs).
-# 0.6.5 is not yet available on the AIPCC index.
-pyasn1>=0.6.4
+# pyasn1 0.6.5 fixes CVE-2026-119194/119195/119196/119197 (quadratic-time DoS
+# via crafted ASN.1 inputs); 0.6.4 already fixed CVE-2026-59884/59885/59886.
+pyasn1>=0.6.5
 
 # GitPython 3.2.0+ fixes CVE-2026-67325 (and CVE-2026-67323) command injection issues in the shipped runtime image.
 gitpython>=3.2.0
@@ -50,7 +67,8 @@ gitpython>=3.2.0
 graphql-core>=3.2.12,<3.3
 
 # certifi 2026.10.18+ removes expired/distrusted root certificates.
-certifi>=2026.10.18
+# Held at 2026.10.19: 2026.10.23 fixes no CVEs; avoid z-stream churn.
+certifi==2026.10.19
 
 # urllib3 2.8.0+ fixes security vulnerabilities in the shipped runtime image.
 urllib3>=2.8.0
@@ -58,10 +76,8 @@ urllib3>=2.8.0
 # sqlparse 0.6.0+ fixes CVE-2026-71491 (quadratic CPU consumption in comment grouping).
 sqlparse>=0.6.0
 
-# Protobuf 6.32+ crashes while importing MLflow's generated descriptors on
-# s390x (upstream: protobuf#29651), so the runtime image cannot start there.
-# 6.31.1 is the last crash-free 6.x on the AIPCC index; it is affected by
-# CVE-2026-0994 (DoS in json_format.ParseDict via nested Any messages),
-# which MLflow's protos do not use. Preferred long-term fix: protobuf 7.x
-# once a databricks-sdk that allows it (>=0.154.0) is on the AIPCC index.
-protobuf==6.31.1
+# Protobuf 7.x fixes CVE-2026-0994 (DoS in json_format.ParseDict via nested
+# Any messages) and the s390x import crash affecting the 6.32+ series
+# (upstream: protobuf#29651). Requires databricks-sdk>=0.154.0, which allows
+# protobuf < 8.0.
+protobuf>=7

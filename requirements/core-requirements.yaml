@@ -42,8 +42,8 @@ sqlalchemy:
 
 cryptography:
   pip_release: cryptography
-  minimum: "49.0.0"
-  max_major_version: 49
+  minimum: "50.0.1"
+  max_major_version: 50
 
 gunicorn:
   pip_release: gunicorn
