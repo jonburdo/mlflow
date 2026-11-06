@@ -23,7 +23,8 @@ kubernetes
 # hf-xet has no ppc64le or s390x wheel; retain its platform marker in the
 # generated lock when regenerating it.
 aiohttp==3.14.4
-cryptography==48.0.1
+# cryptography 49.0.0 fixes CVE-2026-69249 in the shipped runtime image.
+cryptography==49.0.0
 litellm<2,>=1.101.0-rc1
 matplotlib==3.11.0
 numpy==2.5.1
