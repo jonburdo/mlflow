@@ -6587,6 +6587,15 @@ def _get_list_scorers_request():
 
 
 def _get_scorer_list_scope():
+    """Read the private ListScorers auth handoff, not an HTTP selector.
+
+    To opt in, auth plugins set ``app.config[SCORER_LIST_SCOPE_REQUIRED]`` and
+    write ``SCOPED_SCORER_LIST`` on the Flask request (not ``g``) before every
+    accepted dispatch, including HEAD and administrator requests. Explicit
+    ``None`` means unrestricted; an empty ``ScorerListScope`` denies all rows.
+    Missing required state and invalid types are configuration errors. Plugins
+    that do not opt in must enforce their own listing restrictions.
+    """
     missing = object()
     scope = getattr(request, SCOPED_SCORER_LIST, missing)
     if scope is missing:

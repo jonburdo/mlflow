@@ -1722,7 +1722,12 @@ class AbstractStore(SkillRegistryMixin, MCPServerRegistryMixin, GatewayStoreMixi
 
     @property
     def supports_scorer_list_scope(self) -> bool:
-        """Complete pre-payload enforcement, including exclusions; false by default."""
+        """Whether both scorer listing methods enforce the complete scope before loading payloads.
+
+        Overrides of either listing method must preserve enforcement (including exclusions)
+        or disable this capability. Unsupported concrete scopes, including empty scopes, are
+        rejected rather than retried without authorization restrictions.
+        """
         return False
 
     def _filter_valid_scorer_experiment_ids(self, experiment_ids) -> list[str]:

@@ -359,10 +359,14 @@ def test_custom_identity_admin_aliases_and_request_isolation(scoped_auth_app, mo
     assert response.json["error_code"] == "INTERNAL_ERROR"
 
 
-@pytest.mark.parametrize("prefix", ["", "/tracking"])
-def test_head_scope_dispatch_selection_parent_gate_and_missing_writer(
-    scoped_auth_app, monkeypatch, prefix
-):
+@pytest.fixture(params=["", "/tracking"], ids=["no-prefix", "prefixed"])
+def head_prefix(request):
+    return request.param
+
+
+@pytest.fixture
+def head_listing(head_prefix, scoped_auth_app, monkeypatch, alias, fail_closed):
+    prefix = head_prefix
     app, tracking, auth_store, e = scoped_auth_app
     grant(
         auth_store,
@@ -372,6 +376,7 @@ def test_head_scope_dispatch_selection_parent_gate_and_missing_writer(
     foreign = tracking.create_experiment("unreadable-parent")
     tracking.register_scorer(foreign, "other", "{}")
     monkeypatch.setenv(auth.STATIC_PREFIX_ENV_VAR, prefix)
+    monkeypatch.setenv("MLFLOW_BASIC_AUTH_FAIL_CLOSED", str(fail_closed).lower())
     scopes = {
         (path, method): scoper
         for path, scoper, methods in auth.get_endpoints(auth.REQUEST_SCOPE_FUNCTIONS.get)
@@ -386,10 +391,9 @@ def test_head_scope_dispatch_selection_parent_gate_and_missing_writer(
     }
     monkeypatch.setattr(auth, "REQUEST_SCOPE_HANDLERS", scopes)
     monkeypatch.setattr(auth, "BEFORE_REQUEST_VALIDATORS", validators)
-    paths = [f"{prefix}/{alias}/3.0/mlflow/scorers/list" for alias in ("api", "ajax-api")]
+    path = f"{prefix}/{alias}/3.0/mlflow/scorers/list"
     if prefix:
-        for index, path in enumerate(paths):
-            app.add_url_rule(path, f"prefixed{index}", handlers._list_scorers)
+        app.add_url_rule(path, "prefixed", handlers._list_scorers)
     decisions = []
 
     @app.after_request
@@ -401,77 +405,101 @@ def test_head_scope_dispatch_selection_parent_gate_and_missing_writer(
     batch = Mock(wraps=tracking.list_scorers_across_experiments)
     monkeypatch.setattr(tracking, "list_scorers", singular)
     monkeypatch.setattr(tracking, "list_scorers_across_experiments", batch)
-    client = app.test_client()
-    for fail_closed in (False, True):
-        monkeypatch.setenv("MLFLOW_BASIC_AUTH_FAIL_CLOSED", str(fail_closed).lower())
-        for path in paths:
-            for user in ("alice", "admin"):
-                headers = {"X-Test-User": user}
-                for query in ({"experiment_id": e}, {"experiment_ids": [e]}, {}):
-                    singular.reset_mock()
-                    batch.reset_mock()
-                    response = client.head(path, query_string=query, headers=headers)
-                    expected = 403 if fail_closed and user == "alice" else 200
-                    assert response.status_code == expected
-                    assert response.data == b""
-                    if expected == 200:
-                        if user == "admin":
-                            assert decisions[-1] is None
-                        else:
-                            assert decisions[-1].permits(e, "allowed")
-                            assert not decisions[-1].permits(e, "denied")
-                        if "experiment_id" in query:
-                            assert singular.call_args.args == (e,)
-                        elif "experiment_ids" in query:
-                            assert not singular.called
-                            assert batch.call_args.args == ([e],)
-                    else:
-                        singular.assert_not_called()
-                        batch.assert_not_called()
-                # Accepted HEAD must not lose the singular parent permission check.
-                response = client.head(
-                    path, query_string={"experiment_id": foreign}, headers=headers
-                )
-                assert response.status_code == (200 if user == "admin" else 403)
-                assert response.data == b""
-                # Query selection wins over the JSON body, just as for GET.
-                response = client.head(
-                    path,
-                    query_string={"experiment_id": foreign},
-                    json={"experiment_id": e},
-                    headers=headers,
-                )
-                assert response.status_code == (200 if user == "admin" else 403)
-                assert response.data == b""
-                if not fail_closed or user == "admin":
-                    response = client.head(
-                        path,
-                        query_string={"experiment_id": e, "experiment_ids": [e]},
-                        headers=headers,
-                    )
-                    assert response.status_code == 400
-                    assert response.data == b""
-                    for selection in ({"experimentId": e}, {"experiment_ids": []}):
-                        singular.reset_mock()
-                        batch.reset_mock()
-                        response = client.head(path, json=selection, headers=headers)
-                        assert response.status_code == 200
-                        assert response.data == b""
-                        if "experimentId" in selection:
-                            assert singular.call_args.args == (e,)
-                        else:
-                            singular.assert_not_called()
-                            assert batch.call_args.args == ([],)
-            # Removing the writer must still fail closed, never imply unrestricted.
-            key = (path, "GET")
-            writer = scopes.pop(key)
-            try:
-                for user in ("alice", "admin"):
-                    response = client.head(path, headers={"X-Test-User": user})
-                    assert response.status_code == (403 if fail_closed and user == "alice" else 500)
-                    assert response.data == b""
-            finally:
-                scopes[key] = writer
+    return SimpleNamespace(
+        client=app.test_client(),
+        path=path,
+        experiment_id=e,
+        foreign_id=foreign,
+        scopes=scopes,
+        decisions=decisions,
+        singular=singular,
+        batch=batch,
+    )
+
+
+@pytest.mark.parametrize("alias", ["api", "ajax-api"])
+@pytest.mark.parametrize("fail_closed", [False, True], ids=["legacy", "fail-closed"])
+@pytest.mark.parametrize("user", ["alice", "admin"])
+@pytest.mark.parametrize(
+    "selector", ["singular", "plural", "omitted", "json-singular", "json-empty"]
+)
+def test_head_scope_selector_dispatch(head_listing, fail_closed, user, selector):
+    listing = head_listing
+    e = listing.experiment_id
+    kwargs = {
+        "singular": {"query_string": {"experiment_id": e}},
+        "plural": {"query_string": {"experiment_ids": [e]}},
+        "omitted": {},
+        "json-singular": {"json": {"experimentId": e}},
+        "json-empty": {"json": {"experiment_ids": []}},
+    }[selector]
+    response = listing.client.head(listing.path, headers={"X-Test-User": user}, **kwargs)
+    expected = 403 if fail_closed and user == "alice" else 200
+    assert response.status_code == expected
+    assert response.data == b""
+    if expected == 403:
+        listing.singular.assert_not_called()
+        listing.batch.assert_not_called()
+        return
+
+    decision = listing.decisions[-1]
+    if user == "admin":
+        assert decision is None
+    else:
+        assert decision.permits(e, "allowed")
+        assert not decision.permits(e, "denied")
+
+    if selector in ("singular", "json-singular"):
+        assert listing.singular.call_args.args == (e,)
+    elif selector in ("plural", "json-empty"):
+        listing.singular.assert_not_called()
+        assert listing.batch.call_args.args == ([e] if selector == "plural" else [],)
+
+
+@pytest.mark.parametrize("alias", ["api", "ajax-api"])
+@pytest.mark.parametrize("fail_closed", [False, True], ids=["legacy", "fail-closed"])
+@pytest.mark.parametrize("user", ["alice", "admin"])
+@pytest.mark.parametrize("conflicting_body", [False, True], ids=["query-only", "query-wins"])
+def test_head_scope_checks_singular_parent(head_listing, user, conflicting_body):
+    listing = head_listing
+    kwargs = {"json": {"experiment_id": listing.experiment_id}} if conflicting_body else {}
+    response = listing.client.head(
+        listing.path,
+        query_string={"experiment_id": listing.foreign_id},
+        headers={"X-Test-User": user},
+        **kwargs,
+    )
+    assert response.status_code == (200 if user == "admin" else 403)
+    assert response.data == b""
+
+
+@pytest.mark.parametrize("alias", ["api", "ajax-api"])
+@pytest.mark.parametrize(
+    ("fail_closed", "user"),
+    [(False, "alice"), (False, "admin"), (True, "admin")],
+    ids=["legacy-alice", "legacy-admin", "fail-closed-admin"],
+)
+def test_head_scope_rejects_mixed_selectors(head_listing, user):
+    listing = head_listing
+    e = listing.experiment_id
+    response = listing.client.head(
+        listing.path,
+        query_string={"experiment_id": e, "experiment_ids": [e]},
+        headers={"X-Test-User": user},
+    )
+    assert response.status_code == 400
+    assert response.data == b""
+
+
+@pytest.mark.parametrize("alias", ["api", "ajax-api"])
+@pytest.mark.parametrize("fail_closed", [False, True], ids=["legacy", "fail-closed"])
+@pytest.mark.parametrize("user", ["alice", "admin"])
+def test_head_scope_requires_writer(head_listing, fail_closed, user):
+    listing = head_listing
+    listing.scopes.pop((listing.path, "GET"))
+    response = listing.client.head(listing.path, headers={"X-Test-User": user})
+    assert response.status_code == (403 if fail_closed and user == "alice" else 500)
+    assert response.data == b""
 
 
 @pytest.mark.parametrize(
